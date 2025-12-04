@@ -5,7 +5,8 @@
 # 
 # Run 'make help' to see all available targets
 
-.PHONY: help install setup deploy data incidents simulate capture analyze reset clean all
+.PHONY: help install setup deploy data incidents simulate capture analyze reset clean all \
+        check check-debug test test-check chaos-check chaos-check-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -32,7 +33,7 @@ help: ## Show this help message
 	@echo "========================================"
 	@echo ""
 	@echo "$(GREEN)Setup & Installation:$(RESET)"
-	@grep -E '^(install|setup|check):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
+	@grep -E '^(install|setup|check|check-debug):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(GREEN)Deployment & Data:$(RESET)"
 	@grep -E '^(deploy|data|users|incidents|simulate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
@@ -42,6 +43,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Code Quality:$(RESET)"
 	@grep -E '^(lint|format|validate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(GREEN)Testing:$(RESET)"
+	@grep -E '^(test|chaos-):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(GREEN)Dependency Management:$(RESET)"
 	@grep -E '^deps-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
@@ -82,6 +86,10 @@ setup: install ## Full setup: install dependencies and create .env file
 check: ## Check connection to Operaton instance
 	@echo "$(CYAN)Checking Operaton connection...$(RESET)"
 	$(NODE) $(SCRIPTS_DIR)/check-connection.js
+
+check-debug: ## Check connection with debug output
+	@echo "$(CYAN)Checking Operaton connection (debug mode)...$(RESET)"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/check-connection.js
 
 #---------------------------------------------------------------------------
 # DEPLOYMENT & DATA GENERATION
@@ -203,6 +211,25 @@ all: setup deploy data simulate incidents capture analyze ## Complete workflow f
 
 fresh: reset-force deploy data simulate incidents capture ## Fresh start: reset then full workflow
 	@echo "$(GREEN)✓ Fresh workflow complete$(RESET)"
+
+#---------------------------------------------------------------------------
+# TESTING
+#---------------------------------------------------------------------------
+
+test: ## Run all tests
+	@echo "$(CYAN)Running all tests...$(RESET)"
+	$(NODE) tests/chaos-check-connection.js
+	@echo "$(GREEN)✓ All tests passed$(RESET)"
+
+test-check: chaos-check ## Alias for chaos-check
+
+chaos-check: ## Run chaos tests for check-connection.js
+	@echo "$(CYAN)Running chaos tests for check-connection...$(RESET)"
+	$(NODE) tests/chaos-check-connection.js
+
+chaos-check-debug: ## Run chaos tests with debug output
+	@echo "$(CYAN)Running chaos tests for check-connection (debug mode)...$(RESET)"
+	DEBUG=true $(NODE) tests/chaos-check-connection.js
 
 #---------------------------------------------------------------------------
 # CODE QUALITY
