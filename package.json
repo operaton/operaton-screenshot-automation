@@ -55,7 +55,7 @@
     "dotenv": "^17.2.3",
     "form-data": "^4.0.1",
     "glob": "^13.0.0",
-    "puppeteer": "^24.15.0"
+    "puppeteer": "^24.32.0"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
