@@ -55,11 +55,11 @@ Run `make help` to see all available commands:
 
 ### Setup & Installation
 
-| Command        | Description                       |
-| -------------- | --------------------------------- |
-| `make install` | Install npm dependencies          |
-| `make setup`   | Full setup: install + create .env |
-| `make check`   | Check connection to Operaton      |
+| Command        | Description                       | Docs                           |
+| -------------- | --------------------------------- | ------------------------------ |
+| `make install` | Install npm dependencies          |                                |
+| `make setup`   | Full setup: install + create .env |                                |
+| `make check`   | Check connection to Operaton      | [📖](docs/check-connection.md) |
 
 ### Deployment & Data
 
