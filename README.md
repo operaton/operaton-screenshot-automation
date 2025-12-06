@@ -117,13 +117,13 @@ Run `make help` to see all available commands:
 
 ### Status & Debugging
 
-| Command                 | Description              |
-| ----------------------- | ------------------------ |
-| `make status`           | Show environment status  |
-| `make list-deployments` | List current deployments |
-| `make list-instances`   | List running instances   |
-| `make list-incidents`   | List current incidents   |
-| `make list-tasks`       | List current tasks       |
+| Command                 | Description              | Docs                      |
+| ----------------------- | ------------------------ | ------------------------- |
+| `make status`           | Show environment status  | [📖](docs/show-status.md) |
+| `make list-deployments` | List current deployments |                           |
+| `make list-instances`   | List running instances   |                           |
+| `make list-incidents`   | List current incidents   |                           |
+| `make list-tasks`       | List current tasks       |                           |
 
 ## Configuration
 
