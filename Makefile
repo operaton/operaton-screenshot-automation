@@ -6,7 +6,8 @@
 # Run 'make help' to see all available targets
 
 .PHONY: help install setup deploy data incidents simulate capture analyze reset clean all \
-        check check-debug test test-check chaos-check chaos-check-debug
+        check check-debug test test-check chaos-check chaos-check-debug status-debug \
+		chaos-status chaos-status-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -90,6 +91,10 @@ check: ## Check connection to Operaton instance
 check-debug: ## Check connection with debug output
 	@echo "$(CYAN)Checking Operaton connection (debug mode)...$(RESET)"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/check-connection.js
+
+status-debug: ## Show status with debug output
+	@echo "$(CYAN)Showing Operaton status (debug mode)...$(RESET)"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/show-status.js
 
 #---------------------------------------------------------------------------
 # DEPLOYMENT & DATA GENERATION
@@ -219,6 +224,7 @@ fresh: reset-force deploy data simulate incidents capture ## Fresh start: reset 
 test: ## Run all tests
 	@echo "$(CYAN)Running all tests...$(RESET)"
 	$(NODE) tests/chaos-check-connection.js
+	$(NODE) tests/chaos-show-status.js
 	@echo "$(GREEN)✓ All tests passed$(RESET)"
 
 test-check: chaos-check ## Alias for chaos-check
@@ -230,6 +236,14 @@ chaos-check: ## Run chaos tests for check-connection.js
 chaos-check-debug: ## Run chaos tests with debug output
 	@echo "$(CYAN)Running chaos tests for check-connection (debug mode)...$(RESET)"
 	DEBUG=true $(NODE) tests/chaos-check-connection.js
+
+chaos-status: ## Run chaos tests for show-status.js
+	@echo "$(CYAN)Running chaos tests for show-status...$(RESET)"
+	$(NODE) tests/chaos-show-status.js
+
+chaos-status-debug: ## Run chaos tests for show-status with debug output
+	@echo "$(CYAN)Running chaos tests for show-status (debug mode)...$(RESET)"
+	DEBUG=true $(NODE) tests/chaos-show-status.js
 
 #---------------------------------------------------------------------------
 # CODE QUALITY
