@@ -9,10 +9,11 @@
  * This script:
  * 1. Scans markdown files for image references
  * 2. Categorizes them by webapp (cockpit, tasklist, admin)
- * 3. Identifies which ones are Camunda-specific
+ * 3. Identifies which ones need replacement
  * 4. Generates a replacement plan
  */
 
+import 'dotenv/config';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,9 +21,13 @@ import { glob } from 'glob';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Patterns that indicate Camunda-specific screenshots
-const CAMUNDA_PATTERNS = [
-  /camunda/i,
+const config = {
+  docsPath: process.env.DOCS_PATH || process.argv[2] || '../../docs',
+  outputDir: process.env.OUTPUT_DIR || './output',
+};
+
+// Patterns that indicate legacy screenshots needing replacement
+const LEGACY_PATTERNS = [
   /cockpit/i,
   /tasklist/i,
   /admin-/i,
@@ -75,13 +80,25 @@ const CATEGORIES = {
 };
 
 /**
+ * Log debug information if DEBUG mode is enabled
+ * @param {string} message - Debug message
+ */
+function debug(message) {
+  if (process.env.DEBUG === 'true') {
+    console.log(`    [DEBUG] ${message}`);
+  }
+}
+
+/**
  * Categorize a screenshot based on its path/name
+ * @param {string} imagePath - Path to the image
+ * @returns {string} - Category name
  */
 function categorizeScreenshot(imagePath) {
   const pathLower = imagePath.toLowerCase();
 
-  for (const [category, config] of Object.entries(CATEGORIES)) {
-    for (const pattern of config.patterns) {
+  for (const [category, categoryConfig] of Object.entries(CATEGORIES)) {
+    for (const pattern of categoryConfig.patterns) {
       if (pattern.test(pathLower)) {
         return category;
       }
@@ -92,15 +109,20 @@ function categorizeScreenshot(imagePath) {
 }
 
 /**
- * Check if screenshot is likely Camunda-specific (needs replacement)
+ * Check if screenshot is legacy and needs replacement
+ * @param {string} imagePath - Path to the image
+ * @returns {boolean} - True if needs replacement
  */
-function isCamundaSpecific(imagePath) {
+function isLegacyScreenshot(imagePath) {
   const pathLower = imagePath.toLowerCase();
-  return CAMUNDA_PATTERNS.some(pattern => pattern.test(pathLower));
+  return LEGACY_PATTERNS.some(pattern => pattern.test(pathLower));
 }
 
 /**
  * Extract image references from markdown content
+ * @param {string} content - File content
+ * @param {string} filePath - Source file path
+ * @returns {Array} - Array of image references
  */
 function extractImageReferences(content, filePath) {
   const images = [];
@@ -114,6 +136,7 @@ function extractImageReferences(content, filePath) {
 
     // Skip external URLs
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      debug(`Skipping external URL: ${imagePath}`);
       continue;
     }
 
@@ -135,7 +158,10 @@ function extractImageReferences(content, filePath) {
   while ((match = htmlRegex.exec(content)) !== null) {
     const imagePath = match[1];
 
-    if (imagePath.startsWith('http')) continue;
+    if (imagePath.startsWith('http')) {
+      debug(`Skipping external URL: ${imagePath}`);
+      continue;
+    }
 
     images.push({
       alt: '',
@@ -151,28 +177,49 @@ function extractImageReferences(content, filePath) {
 
 /**
  * Analyze a single markdown file
+ * @param {string} filePath - Path to markdown file
+ * @returns {Promise<Array>} - Array of analyzed images
  */
 async function analyzeFile(filePath) {
-  const content = await fs.readFile(filePath, 'utf8');
-  const images = extractImageReferences(content, filePath);
+  try {
+    const content = await fs.readFile(filePath, 'utf8');
+    const images = extractImageReferences(content, filePath);
 
-  return images.map(img => ({
-    ...img,
-    category: categorizeScreenshot(img.path),
-    needsReplacement: isCamundaSpecific(img.path),
-  }));
+    debug(`${filePath}: found ${images.length} images`);
+
+    return images.map(img => ({
+      ...img,
+      category: categorizeScreenshot(img.path),
+      needsReplacement: isLegacyScreenshot(img.path),
+    }));
+  } catch (error) {
+    console.error(`  ✗ Error reading ${filePath}: ${error.message}`);
+    return [];
+  }
 }
 
 /**
  * Find all markdown files in documentation
+ * @param {string} docsPath - Path to documentation directory
+ * @returns {Promise<Array>} - Array of file paths
  */
-function findMarkdownFiles(docsPath) {
-  const pattern = path.join(docsPath, '**/*.{md,mdx}');
-  return glob(pattern, { ignore: ['**/node_modules/**'] });
+async function findMarkdownFiles(docsPath) {
+  const pattern = path.join(docsPath, '**/*.{md,mdx}').replace(/\\/g, '/');
+  debug(`Glob pattern: ${pattern}`);
+
+  try {
+    const files = await glob(pattern, { ignore: ['**/node_modules/**'] });
+    return files;
+  } catch (error) {
+    console.error(`  ✗ Error scanning for files: ${error.message}`);
+    return [];
+  }
 }
 
 /**
  * Generate replacement report
+ * @param {Array} allImages - All analyzed images
+ * @returns {Object} - Report object
  */
 function generateReport(allImages) {
   const report = {
@@ -222,6 +269,8 @@ function generateReport(allImages) {
 
 /**
  * Generate markdown report file
+ * @param {Object} report - Report object
+ * @returns {string} - Markdown content
  */
 function generateMarkdownReport(report) {
   let md = `# Operaton Screenshot Replacement Plan
@@ -248,7 +297,7 @@ Generated: ${new Date().toISOString().replace('T', ' ').substring(0, 19)}
   md += `
 ## Replacement Plan
 
-Screenshots that need to be replaced with Operaton equivalents:
+Screenshots that need to be replaced with Operaton versions:
 
 `;
 
@@ -282,17 +331,17 @@ Screenshots that need to be replaced with Operaton equivalents:
 
 1. **Deploy processes to Operaton**
    \`\`\`bash
-   npm run deploy-processes
+   make deploy
    \`\`\`
 
 2. **Generate test data**
    \`\`\`bash
-   npm run generate-data
+   make data
    \`\`\`
 
 3. **Capture screenshots**
    \`\`\`bash
-   npm run capture-screenshots
+   make capture
    \`\`\`
 
 4. **Copy screenshots to documentation**
@@ -309,62 +358,140 @@ To customize which screenshots to capture, edit \`config/screenshots.json\`.
 }
 
 /**
+ * Check if a path exists and is a directory
+ * @param {string} dirPath - Path to check
+ * @returns {Promise<boolean>} - True if exists and is directory
+ */
+async function isDirectory(dirPath) {
+  try {
+    const stats = await fs.stat(dirPath);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Main execution
  */
 async function main() {
   console.log('═'.repeat(60));
   console.log('  Documentation Screenshot Analyzer');
-  console.log(`${'═'.repeat(60)}\n`);
+  console.log('═'.repeat(60));
+  console.log('');
 
-  // Get docs path from command line or use default
-  const docsPath = process.argv[2] || '../../docs';
+  if (process.env.DEBUG === 'true') {
+    console.log('Configuration:');
+    console.log(`  Docs path: ${config.docsPath}`);
+    console.log(`  Output dir: ${config.outputDir}`);
+    console.log('');
+  }
 
-  console.log(`Scanning: ${docsPath}\n`);
+  // Resolve and validate docs path
+  const docsPath = path.resolve(config.docsPath);
+  console.log(`Scanning: ${docsPath}`);
+  console.log('');
+
+  // Check if docs directory exists
+  if (!(await isDirectory(docsPath))) {
+    console.log(`✗ Documentation directory not found: ${docsPath}`);
+    console.log('');
+    console.log('Troubleshooting:');
+    console.log('  1. Verify the path exists');
+    console.log('  2. Set DOCS_PATH in .env file');
+    console.log('  3. Pass path as argument: node scripts/analyze-documentation.js /path/to/docs');
+    process.exit(1);
+  }
 
   // Find all markdown files
   const mdFiles = await findMarkdownFiles(docsPath);
-  console.log(`Found ${mdFiles.length} markdown files\n`);
+
+  if (mdFiles.length === 0) {
+    console.log('⚠ No markdown files found');
+    console.log('');
+    console.log('Troubleshooting:');
+    console.log('  1. Verify the docs directory contains .md or .mdx files');
+    console.log('  2. Check that files are not in node_modules (excluded)');
+    process.exit(0);
+  }
+
+  console.log(`Found ${mdFiles.length} markdown files`);
+  console.log('');
 
   // Analyze each file
   const allImages = [];
 
   for (const file of mdFiles) {
     const images = await analyzeFile(file);
+    if (images.length === 0 && process.env.DEBUG === 'true') {
+      debug(`No images in: ${file}`);
+    }
     allImages.push(...images);
   }
 
-  console.log(`Found ${allImages.length} image references\n`);
+  console.log(`Found ${allImages.length} image references`);
+  console.log('');
+
+  if (allImages.length === 0) {
+    console.log('⚠ No image references found in documentation');
+    console.log('');
+    console.log('═'.repeat(60));
+    process.exit(0);
+  }
 
   // Generate report
   const report = generateReport(allImages);
 
   // Print summary
-  console.log('Summary:');
-  console.log(`  Total screenshots: ${report.summary.total}`);
-  console.log(`  Need replacement:  ${report.summary.needsReplacement}`);
-  console.log('\nBy category:');
+  console.log('─'.repeat(60));
+  console.log('  Summary');
+  console.log('─'.repeat(60));
+  console.log(`  Total screenshots:    ${report.summary.total}`);
+  console.log(`  Need replacement:     ${report.summary.needsReplacement}`);
+  console.log('');
+
+  console.log('─'.repeat(60));
+  console.log('  By Category');
+  console.log('─'.repeat(60));
 
   for (const [category, stats] of Object.entries(report.summary.byCategory)) {
-    console.log(`  ${category}: ${stats.total} total, ${stats.needsReplacement} need replacement`);
+    const padded = category.padEnd(12);
+    console.log(
+      `  ${padded} ${String(stats.total).padStart(4)} total, ${String(stats.needsReplacement).padStart(4)} need replacement`
+    );
+  }
+  console.log('');
+
+  // Save reports
+  const outputDir = path.resolve(config.outputDir);
+
+  try {
+    await fs.mkdir(outputDir, { recursive: true });
+
+    const jsonPath = path.join(outputDir, 'screenshot-analysis.json');
+    const mdPath = path.join(outputDir, 'REPLACEMENT_PLAN.md');
+
+    await fs.writeFile(jsonPath, JSON.stringify(report, null, 2));
+    await fs.writeFile(mdPath, generateMarkdownReport(report));
+
+    console.log('─'.repeat(60));
+    console.log('  Output Files');
+    console.log('─'.repeat(60));
+    console.log(`  ✓ ${jsonPath}`);
+    console.log(`  ✓ ${mdPath}`);
+    console.log('');
+  } catch (error) {
+    console.error(`✗ Error saving reports: ${error.message}`);
+    process.exit(1);
   }
 
-  // Save report
-  const outputDir = path.join(__dirname, '../output');
-  await fs.mkdir(outputDir, { recursive: true });
-
-  const jsonPath = path.join(outputDir, 'screenshot-analysis.json');
-  const mdPath = path.join(outputDir, 'REPLACEMENT_PLAN.md');
-
-  await fs.writeFile(jsonPath, JSON.stringify(report, null, 2));
-  await fs.writeFile(mdPath, generateMarkdownReport(report));
-
-  console.log(`\nReports saved to:`);
-  console.log(`  - ${jsonPath}`);
-  console.log(`  - ${mdPath}`);
-  console.log('');
+  console.log('═'.repeat(60));
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err);
+  console.error('Unexpected error:', err.message);
+  if (process.env.DEBUG === 'true') {
+    console.error(err.stack);
+  }
   process.exit(1);
 });
