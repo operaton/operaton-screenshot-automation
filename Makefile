@@ -7,7 +7,7 @@
 
 .PHONY: help install setup deploy data incidents simulate capture analyze reset clean all \
         check check-debug test test-check chaos-check chaos-check-debug status-debug \
-		chaos-status chaos-status-debug
+		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -181,9 +181,13 @@ capture-admin: ## Capture only Admin screenshots
 	@printf "$(CYAN)Capturing Admin screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=admin
 
-analyze: ## Analyze documentation for screenshots to replace
+analyze: ## Analyze documentation for screenshots to replace (MERGED)
 	@printf "$(CYAN)Analyzing documentation...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
+
+analyze-debug: ## Analyze documentation for screenshots to replace with debug output (MERGED)
+	@printf "$(CYAN)Analyzing documentation (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
 
 #---------------------------------------------------------------------------
 # CLEANUP & RESET
@@ -240,12 +244,22 @@ fresh: reset-force deploy data simulate incidents capture ## Fresh start: reset 
 
 test: ## Run all tests
 	@printf "$(CYAN)Running all tests...$(RESET)\n"
+	$(NODE) tests/chaos-analyze-documentation.js
 	$(NODE) tests/chaos-check-connection.js
 	$(NODE) tests/chaos-show-status.js
 	@printf "$(GREEN)All tests passed$(RESET)\n"
 
+test-analyze: chaos-analyze ## Alias for chaos-analyze
 test-check: chaos-check ## Alias for chaos-check
 test-status: chaos-status ## Alias for chaos-status
+
+chaos-analyze: ## Run chaos tests for analyze-documentation (MERGED)
+	@printf "$(CYAN)Running chaos tests for analyze-documentation...$(RESET)\n"
+	$(NODE) tests/chaos-analyze-documentation.js
+
+chaos-analyze-debug: ## Run chaos tests for analyze-documentation with debug output (MERGED)
+	@printf "$(CYAN)Running chaos tests for analyze-documentation (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-analyze-documentation.js
 
 chaos-check: ## Run chaos tests for checking Operaton instance (MERGED)
 	@printf "$(CYAN)Running chaos tests for checking Operaton connection...$(RESET)\n"

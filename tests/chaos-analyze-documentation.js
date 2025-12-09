@@ -411,8 +411,8 @@ async function runChaosTests() {
 
   if (results.failed > 0) {
     console.log('\nFailed tests:');
-    for (const test of results.tests.filter(t => !t.passed)) {
-      console.log(`  - ${test.name}`);
+    for (const failedTest of results.tests.filter(t => !t.passed)) {
+      console.log(`  - ${failedTest.name}`);
     }
     process.exit(1);
   } else {
@@ -420,7 +420,6 @@ async function runChaosTests() {
     process.exit(0);
   }
 }
-b;
 
 runChaosTests().catch(err => {
   console.error('Chaos test runner failed:', err);
