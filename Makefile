@@ -12,12 +12,21 @@
 # Default target
 .DEFAULT_GOAL := help
 
-# Colors for pretty output
+# Colors for pretty output (cross-platform)
 CYAN := \033[36m
 GREEN := \033[32m
 YELLOW := \033[33m
 RED := \033[31m
 RESET := \033[0m
+
+# Cross-platform echo with color support
+# Usage: @$(call log,$(CYAN),Message here)
+define log
+	@printf "$(1)$(2)$(RESET)\n"
+endef
+
+# Or simpler - just define ECHO:
+ECHO := @printf
 
 # Configuration
 NODE := node
@@ -28,72 +37,80 @@ SCRIPTS_DIR := scripts
 # HELP
 #---------------------------------------------------------------------------
 
+# Replace the entire help: target in your Makefile with this:
+
 help: ## Show this help message
-	@echo ""
-	@echo "$(CYAN)Operaton Screenshot Automation Toolkit$(RESET)"
-	@echo "========================================"
-	@echo ""
-	@echo "$(GREEN)Setup & Installation:$(RESET)"
-	@grep -E '^(install|setup|check|check-debug):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(GREEN)Deployment & Data:$(RESET)"
-	@grep -E '^(deploy|data|users|incidents|simulate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(GREEN)Screenshot Capture:$(RESET)"
-	@grep -E '^(capture|analyze):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(GREEN)Code Quality:$(RESET)"
-	@grep -E '^(lint|format|validate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(GREEN)Testing:$(RESET)"
-	@grep -E '^(test|chaos-):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(GREEN)Dependency Management:$(RESET)"
-	@grep -E '^deps-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(GREEN)Cleanup:$(RESET)"
-	@grep -E '^(reset|clean|wipe):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(GREEN)Workflows:$(RESET)"
-	@grep -E '^(all|full|quick|fresh):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(YELLOW)Examples:$(RESET)"
-	@echo "  make install          # First-time setup"
-	@echo "  make quick            # Quick workflow: deploy + data + capture"
-	@echo "  make validate         # Check code quality before commit"
-	@echo "  make deps-check       # Check for outdated packages"
-	@echo "  make reset            # Wipe all data and start fresh"
-	@echo ""
+	@printf "\n"
+	@printf "$(CYAN)Operaton Screenshot Automation Toolkit$(RESET)\n"
+	@printf "========================================\n"
+	@printf "\n"
+	@printf "$(GREEN)Setup & Installation:$(RESET)\n"
+	@grep -E '^(install|setup|check|check-debug|status|status-debug):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Testing:$(RESET)\n"
+	@grep -E '^(test|chaos-.*):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Deployment & Data:$(RESET)\n"
+	@grep -E '^(deploy|data|users|incidents|simulate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Screenshot Capture:$(RESET)\n"
+	@grep -E '^(capture|analyze):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Code Quality:$(RESET)\n"
+	@grep -E '^(lint|format|validate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Dependency Management:$(RESET)\n"
+	@grep -E '^deps-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Cleanup:$(RESET)\n"
+	@grep -E '^(reset|clean|wipe):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Workflows:$(RESET)\n"
+	@grep -E '^(all|full|quick|fresh):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(YELLOW)Examples:$(RESET)\n"
+	@printf "  make install          # First-time setup\n"
+	@printf "  make quick            # Quick workflow: deploy + data + capture\n"
+	@printf "  make validate         # Check code quality before commit\n"
+	@printf "  make deps-check       # Check for outdated packages\n"
+	@printf "  make chaos-check      # Run chaos tests for check-connection\n"
+	@printf "  make reset            # Wipe all data and start fresh\n"
+	@printf "\n"
 
 #---------------------------------------------------------------------------
 # SETUP & INSTALLATION
 #---------------------------------------------------------------------------
 
 install: ## Install npm dependencies
-	@echo "$(CYAN)Installing dependencies...$(RESET)"
+	@printf "$(CYAN)Installing dependencies...$(RESET)\n"
 	$(NPM) install
-	@echo "$(GREEN)✓ Dependencies installed$(RESET)"
+	@printf "$(GREEN)✓ Dependencies installed$(RESET)\n"
 
 setup: install ## Full setup: install dependencies and create .env file
-	@echo "$(CYAN)Setting up environment...$(RESET)"
+	@printf "$(CYAN)Setting up environment...$(RESET)\n"
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
-		echo "$(YELLOW)Created .env file - please edit with your Operaton credentials$(RESET)"; \
+		echo "$(YELLOW)Created .env file - please edit with your Operaton credentials$(RESET)\n"; \
 	else \
-		echo "$(GREEN)✓ .env file already exists$(RESET)"; \
+		echo "$(GREEN)✓ .env file already exists$(RESET)\n"; \
 	fi
-	@echo "$(GREEN)✓ Setup complete$(RESET)"
+	@printf "$(GREEN)✓ Setup complete$(RESET)\n"
 
-check: ## Check connection to Operaton instance
-	@echo "$(CYAN)Checking Operaton connection...$(RESET)"
+check: ## Check connection to Operaton instance (MERGED)
+	@printf "$(CYAN)Checking Operaton connection...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/check-connection.js
 
-check-debug: ## Check connection with debug output
-	@echo "$(CYAN)Checking Operaton connection (debug mode)...$(RESET)"
+check-debug: ## Check connection to Operaton instance with debug output (MERGED)
+	@printf "$(CYAN)Checking Operaton connection (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/check-connection.js
 
-status-debug: ## Show status with debug output
-	@echo "$(CYAN)Showing Operaton status (debug mode)...$(RESET)"
+status: ## Show current status of Operaton (MERGED)
+	@printf "$(CYAN)Operaton Environment Status$(RESET)\n"
+	@echo "============================"
+	@$(NODE) $(SCRIPTS_DIR)/show-status.js
+
+status-debug: ## Show current status of Operaton with debug output (MERGED)
+	@printf "$(CYAN)Showing Operaton status (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/show-status.js
 
 #---------------------------------------------------------------------------
@@ -101,43 +118,43 @@ status-debug: ## Show status with debug output
 #---------------------------------------------------------------------------
 
 deploy: ## Deploy BPMN/DMN processes to Operaton
-	@echo "$(CYAN)Deploying processes...$(RESET)"
+	@printf "$(CYAN)Deploying processes...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/deploy-processes.js
 
 users: ## Create users and groups only
-	@echo "$(CYAN)Creating users and groups...$(RESET)"
+	@printf "$(CYAN)Creating users and groups...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/generate-data.js --users-only
 
 data: ## Generate test data (users, process instances, tasks)
-	@echo "$(CYAN)Generating test data...$(RESET)"
+	@printf "$(CYAN)Generating test data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/generate-data.js
 
 data-light: ## Generate minimal test data (fewer instances)
-	@echo "$(CYAN)Generating light test data...$(RESET)"
+	@printf "$(CYAN)Generating light test data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/generate-data.js --light
 
 simulate: ## Run simulation scenarios (tokens, history, tasks)
-	@echo "$(CYAN)Running simulation scenarios...$(RESET)"
+	@printf "$(CYAN)Running simulation scenarios...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js
 
 simulate-tokens: ## Simulate processes with visible tokens at various stages
-	@echo "$(CYAN)Simulating token positions...$(RESET)"
+	@printf "$(CYAN)Simulating token positions...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js --tokens
 
 simulate-history: ## Generate completed instances for history views
-	@echo "$(CYAN)Generating history data...$(RESET)"
+	@printf "$(CYAN)Generating history data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js --history
 
 incidents: ## Create intentional incidents (failed jobs, errors)
-	@echo "$(CYAN)Creating incidents...$(RESET)"
+	@printf "$(CYAN)Creating incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js
 
 incidents-script: ## Create incidents via failing script tasks
-	@echo "$(CYAN)Creating script task incidents...$(RESET)"
+	@printf "$(CYAN)Creating script task incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --script-errors
 
 incidents-service: ## Create incidents via failing service tasks
-	@echo "$(CYAN)Creating service task incidents...$(RESET)"
+	@printf "$(CYAN)Creating service task incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --service-errors
 
 #---------------------------------------------------------------------------
@@ -145,27 +162,27 @@ incidents-service: ## Create incidents via failing service tasks
 #---------------------------------------------------------------------------
 
 capture: ## Capture all screenshots (headless)
-	@echo "$(CYAN)Capturing screenshots...$(RESET)"
+	@printf "$(CYAN)Capturing screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
 capture-debug: ## Capture screenshots with visible browser (for debugging)
-	@echo "$(CYAN)Capturing screenshots (debug mode)...$(RESET)"
+	@printf "$(CYAN)Capturing screenshots (debug mode)...$(RESET)\n"
 	HEADLESS=false DEBUG=true $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
 capture-cockpit: ## Capture only Cockpit screenshots
-	@echo "$(CYAN)Capturing Cockpit screenshots...$(RESET)"
+	@printf "$(CYAN)Capturing Cockpit screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=cockpit
 
 capture-tasklist: ## Capture only Tasklist screenshots
-	@echo "$(CYAN)Capturing Tasklist screenshots...$(RESET)"
+	@printf "$(CYAN)Capturing Tasklist screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=tasklist
 
 capture-admin: ## Capture only Admin screenshots
-	@echo "$(CYAN)Capturing Admin screenshots...$(RESET)"
+	@printf "$(CYAN)Capturing Admin screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=admin
 
 analyze: ## Analyze documentation for screenshots to replace
-	@echo "$(CYAN)Analyzing documentation...$(RESET)"
+	@printf "$(CYAN)Analyzing documentation...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
 
 #---------------------------------------------------------------------------
@@ -173,31 +190,31 @@ analyze: ## Analyze documentation for screenshots to replace
 #---------------------------------------------------------------------------
 
 reset: ## Reset Operaton: delete all deployments, instances, and users
-	@echo "$(RED)WARNING: This will delete ALL data from Operaton!$(RESET)"
+	@printf "$(RED)WARNING: This will delete ALL data from Operaton!$(RESET)\n"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	@echo "$(CYAN)Resetting Operaton environment...$(RESET)"
+	@printf "$(CYAN)Resetting Operaton environment...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js
 
 reset-instances: ## Delete all process instances only
-	@echo "$(CYAN)Deleting all process instances...$(RESET)"
+	@printf "$(CYAN)Deleting all process instances...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --instances-only
 
 reset-deployments: ## Delete all deployments only
-	@echo "$(CYAN)Deleting all deployments...$(RESET)"
+	@printf "$(CYAN)Deleting all deployments...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --deployments-only
 
 reset-users: ## Delete created test users only
-	@echo "$(CYAN)Deleting test users...$(RESET)"
+	@printf "$(CYAN)Deleting test users...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --users-only
 
 reset-force: ## Force reset without confirmation prompt
-	@echo "$(CYAN)Force resetting Operaton environment...$(RESET)"
+	@printf "$(CYAN)Force resetting Operaton environment...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --force
 
 clean: ## Clean local output files (screenshots, reports)
-	@echo "$(CYAN)Cleaning output directory...$(RESET)"
+	@printf "$(CYAN)Cleaning output directory...$(RESET)\n"
 	rm -rf output/*
-	@echo "$(GREEN)✓ Output directory cleaned$(RESET)"
+	@printf "$(GREEN)✓ Output directory cleaned$(RESET)\n"
 
 wipe: reset clean ## Full wipe: reset Operaton AND clean local files
 
@@ -206,43 +223,44 @@ wipe: reset clean ## Full wipe: reset Operaton AND clean local files
 #---------------------------------------------------------------------------
 
 quick: deploy data capture ## Quick workflow: deploy, generate data, capture
-	@echo "$(GREEN)✓ Quick workflow complete$(RESET)"
+	@printf "$(GREEN)✓ Quick workflow complete$(RESET)\n"
 
 full: deploy data simulate incidents capture ## Full workflow with all scenarios
-	@echo "$(GREEN)✓ Full workflow complete$(RESET)"
+	@printf "$(GREEN)✓ Full workflow complete$(RESET)\n"
 
 all: setup deploy data simulate incidents capture analyze ## Complete workflow from scratch
-	@echo "$(GREEN)✓ Complete workflow finished$(RESET)"
+	@printf "$(GREEN)✓ Complete workflow finished$(RESET)\n"
 
 fresh: reset-force deploy data simulate incidents capture ## Fresh start: reset then full workflow
-	@echo "$(GREEN)✓ Fresh workflow complete$(RESET)"
+	@printf "$(GREEN)✓ Fresh workflow complete$(RESET)\n"
 
 #---------------------------------------------------------------------------
 # TESTING
 #---------------------------------------------------------------------------
 
 test: ## Run all tests
-	@echo "$(CYAN)Running all tests...$(RESET)"
+	@printf "$(CYAN)Running all tests...$(RESET)\n"
 	$(NODE) tests/chaos-check-connection.js
 	$(NODE) tests/chaos-show-status.js
-	@echo "$(GREEN)✓ All tests passed$(RESET)"
+	@printf "$(GREEN)All tests passed$(RESET)\n"
 
 test-check: chaos-check ## Alias for chaos-check
+test-status: chaos-status ## Alias for chaos-status
 
-chaos-check: ## Run chaos tests for check-connection.js
-	@echo "$(CYAN)Running chaos tests for check-connection...$(RESET)"
+chaos-check: ## Run chaos tests for checking Operaton instance (MERGED)
+	@printf "$(CYAN)Running chaos tests for checking Operaton connection...$(RESET)\n"
 	$(NODE) tests/chaos-check-connection.js
 
-chaos-check-debug: ## Run chaos tests with debug output
-	@echo "$(CYAN)Running chaos tests for check-connection (debug mode)...$(RESET)"
+chaos-check-debug: ## Run chaos tests for checking Operaton instance with debug output (MERGED)
+	@printf "$(CYAN)Running chaos tests for checking Operaton connection (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-check-connection.js
 
-chaos-status: ## Run chaos tests for show-status.js
-	@echo "$(CYAN)Running chaos tests for show-status...$(RESET)"
+chaos-status: ## Run chaos tests for showing current status of Operaton (MERGED)
+	@printf "$(CYAN)Running chaos tests for showing Operaton status...$(RESET)\n"
 	$(NODE) tests/chaos-show-status.js
 
-chaos-status-debug: ## Run chaos tests for show-status with debug output
-	@echo "$(CYAN)Running chaos tests for show-status (debug mode)...$(RESET)"
+chaos-status-debug: ## Run chaos tests for showing current status of Operaton with debug output (MERGED)
+	@printf "$(CYAN)Running chaos tests for showing Operaton status (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-show-status.js
 
 #---------------------------------------------------------------------------
@@ -250,23 +268,23 @@ chaos-status-debug: ## Run chaos tests for show-status with debug output
 #---------------------------------------------------------------------------
 
 lint: ## Run ESLint on all scripts
-	@echo "$(CYAN)Running ESLint...$(RESET)"
+	@printf "$(CYAN)Running ESLint...$(RESET)\n"
 	$(NPM) run lint
 
 lint-fix: ## Run ESLint and auto-fix issues
-	@echo "$(CYAN)Running ESLint with auto-fix...$(RESET)"
+	@printf "$(CYAN)Running ESLint with auto-fix...$(RESET)\n"
 	$(NPM) run lint:fix
 
 format: ## Format all code with Prettier
-	@echo "$(CYAN)Formatting code...$(RESET)"
+	@printf "$(CYAN)Formatting code...$(RESET)\n"
 	$(NPM) run format
 
 format-check: ## Check code formatting without changes
-	@echo "$(CYAN)Checking code format...$(RESET)"
+	@printf "$(CYAN)Checking code format...$(RESET)\n"
 	$(NPM) run format:check
 
 validate: ## Run all code quality checks (lint + format)
-	@echo "$(CYAN)Validating code...$(RESET)"
+	@printf "$(CYAN)Validating code...$(RESET)\n"
 	$(NPM) run validate
 
 #---------------------------------------------------------------------------
@@ -274,23 +292,23 @@ validate: ## Run all code quality checks (lint + format)
 #---------------------------------------------------------------------------
 
 deps-check: ## Check for outdated dependencies
-	@echo "$(CYAN)Checking for outdated packages...$(RESET)"
+	@printf "$(CYAN)Checking for outdated packages...$(RESET)\n"
 	$(NPM) run deps:check
 
 deps-update: ## Update all dependencies to latest
-	@echo "$(CYAN)Updating all dependencies...$(RESET)"
+	@printf "$(CYAN)Updating all dependencies...$(RESET)\n"
 	$(NPM) run deps:update
 
 deps-update-minor: ## Update dependencies (minor/patch only, safer)
-	@echo "$(CYAN)Updating dependencies (minor/patch only)...$(RESET)"
+	@printf "$(CYAN)Updating dependencies (minor/patch only)...$(RESET)\n"
 	$(NPM) run deps:update:minor
 
 deps-audit: ## Run security audit
-	@echo "$(CYAN)Running security audit...$(RESET)"
+	@printf "$(CYAN)Running security audit...$(RESET)\n"
 	$(NPM) run deps:audit
 
 deps-audit-fix: ## Fix security vulnerabilities
-	@echo "$(CYAN)Fixing security vulnerabilities...$(RESET)"
+	@printf "$(CYAN)Fixing security vulnerabilities...$(RESET)\n"
 	$(NPM) run deps:audit:fix
 
 #---------------------------------------------------------------------------
@@ -298,14 +316,14 @@ deps-audit-fix: ## Fix security vulnerabilities
 #---------------------------------------------------------------------------
 
 hooks-install: ## Install git hooks (husky)
-	@echo "$(CYAN)Installing git hooks...$(RESET)"
+	@printf "$(CYAN)Installing git hooks...$(RESET)\n"
 	npx husky install
-	@echo "$(GREEN)✓ Git hooks installed$(RESET)"
+	@printf "$(GREEN)✓ Git hooks installed$(RESET)\n"
 
 hooks-uninstall: ## Uninstall git hooks
-	@echo "$(CYAN)Uninstalling git hooks...$(RESET)"
+	@printf "$(CYAN)Uninstalling git hooks...$(RESET)\n"
 	rm -rf .husky/_
-	@echo "$(GREEN)✓ Git hooks uninstalled$(RESET)"
+	@printf "$(GREEN)✓ Git hooks uninstalled$(RESET)\n"
 
 #---------------------------------------------------------------------------
 # DEVELOPMENT & DEBUGGING
@@ -335,7 +353,3 @@ list-tasks: ## List current tasks
 			auth: { username: process.env.OPERATON_USERNAME, password: process.env.OPERATON_PASSWORD } \
 		}).then(r => console.log(JSON.stringify(r.data, null, 2))).catch(e => console.error(e.message))"
 
-status: ## Show current status of Operaton (counts)
-	@echo "$(CYAN)Operaton Environment Status$(RESET)"
-	@echo "============================"
-	@$(NODE) $(SCRIPTS_DIR)/show-status.js
