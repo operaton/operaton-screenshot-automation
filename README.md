@@ -88,13 +88,14 @@ Run `make help` to see all available commands:
 
 ### Screenshot Capture
 
-| Command                 | Description                        |
-| ----------------------- | ---------------------------------- |
-| `make capture`          | Capture all screenshots (headless) |
-| `make capture-debug`    | Capture with visible browser       |
-| `make capture-cockpit`  | Capture only Cockpit screenshots   |
-| `make capture-tasklist` | Capture only Tasklist screenshots  |
-| `make capture-admin`    | Capture only Admin screenshots     |
+| Command                 | Description                                      | Docs                                |
+| ----------------------- | ------------------------------------------------ | ----------------------------------- |
+| `make analyze`          | Analyze documentation for screenshots to replace | [📖](docs/analyze-documentation.md) |
+| `make capture`          | Capture all screenshots (headless)               |                                     |
+| `make capture-debug`    | Capture with visible browser                     |                                     |
+| `make capture-cockpit`  | Capture only Cockpit screenshots                 |                                     |
+| `make capture-tasklist` | Capture only Tasklist screenshots                |                                     |
+| `make capture-admin`    | Capture only Admin screenshots                   |                                     |
 
 ### Cleanup & Reset
 
