@@ -95,6 +95,9 @@ function runAnalyze(args = [], envOverrides = {}, timeout = 30000) {
   return new Promise(resolve => {
     const env = {
       ...process.env,
+      // Clear .env values that would interfere with tests
+      DOCS_PATH: '',
+      REPLACE_ALL: '',
       ...envOverrides,
     };
 
@@ -234,7 +237,7 @@ async function runChaosTests() {
     await test(
       'Non-existent directory',
       ['/path/that/does/not/exist/anywhere'],
-      {},
+      { DOCS_PATH: '', REPLACE_ALL: 'false' },
       {
         exitCode: 1,
         stdoutContains: ['Documentation directory not found', 'Troubleshooting'],
@@ -244,8 +247,8 @@ async function runChaosTests() {
 
     await test(
       'Empty path argument',
-      [''],
-      { DOCS_PATH: '' },
+      [],
+      { DOCS_PATH: '/path/that/does/not/exist', REPLACE_ALL: 'false' },
       {
         exitCode: 1,
         stdoutContains: ['Documentation directory not found'],
@@ -264,7 +267,7 @@ async function runChaosTests() {
     await test(
       'Empty directory (no markdown files)',
       [join(tempDir, 'docs-empty')],
-      {},
+      { DOCS_PATH: '', REPLACE_ALL: 'false' },
       {
         exitCode: 0,
         stdoutContains: ['No markdown files found'],
@@ -275,7 +278,7 @@ async function runChaosTests() {
     await test(
       'Markdown files without images',
       [join(tempDir, 'docs-no-images')],
-      {},
+      { DOCS_PATH: '', REPLACE_ALL: 'false' },
       {
         exitCode: 0,
         stdoutContains: ['Found 1 markdown files', 'No image references found'],
@@ -294,7 +297,7 @@ async function runChaosTests() {
     await test(
       'Directory with images',
       [join(tempDir, 'docs-with-images')],
-      {},
+      { DOCS_PATH: '', REPLACE_ALL: 'false' },
       {
         exitCode: 0,
         stdoutContains: [
@@ -311,7 +314,7 @@ async function runChaosTests() {
     await test(
       'Categorizes cockpit screenshots',
       [join(tempDir, 'docs-with-images')],
-      {},
+      { DOCS_PATH: '', REPLACE_ALL: 'false' },
       {
         exitCode: 0,
         stdoutContains: ['cockpit'],
@@ -322,7 +325,7 @@ async function runChaosTests() {
     await test(
       'Generates output files',
       [join(tempDir, 'docs-with-images')],
-      { OUTPUT_DIR: join(tempDir, 'output') },
+      { DOCS_PATH: '', OUTPUT_DIR: join(tempDir, 'output'), REPLACE_ALL: 'false' },
       {
         exitCode: 0,
         stdoutContains: ['screenshot-analysis.json', 'REPLACEMENT_PLAN.md'],
@@ -341,7 +344,7 @@ async function runChaosTests() {
     await test(
       'Debug mode shows configuration',
       [join(tempDir, 'docs-with-images')],
-      { DEBUG: 'true' },
+      { DEBUG: 'true', DOCS_PATH: '', REPLACE_ALL: 'false' },
       {
         exitCode: 0,
         stdoutContains: ['Configuration:', 'Docs path:', 'Output dir:'],
@@ -352,7 +355,7 @@ async function runChaosTests() {
     await test(
       'Debug mode on non-existent path',
       ['/path/that/does/not/exist'],
-      { DEBUG: 'true' },
+      { DEBUG: 'true', DOCS_PATH: '', REPLACE_ALL: 'false' },
       {
         exitCode: 1,
         stdoutContains: ['Configuration:', 'Documentation directory not found'],

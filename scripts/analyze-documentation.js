@@ -24,6 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config = {
   docsPath: process.env.DOCS_PATH || process.argv[2] || '../../docs',
   outputDir: process.env.OUTPUT_DIR || './output',
+  replaceAll: process.env.REPLACE_ALL === 'true',
 };
 
 // Patterns that indicate legacy screenshots needing replacement
@@ -109,11 +110,16 @@ function categorizeScreenshot(imagePath) {
 }
 
 /**
- * Check if screenshot is legacy and needs replacement
+ * Check if screenshot needs replacement
  * @param {string} imagePath - Path to the image
  * @returns {boolean} - True if needs replacement
  */
-function isLegacyScreenshot(imagePath) {
+function needsReplacement(imagePath) {
+  // If REPLACE_ALL is enabled, all screenshots need replacement
+  if (config.replaceAll) {
+    return true;
+  }
+
   const pathLower = imagePath.toLowerCase();
   return LEGACY_PATTERNS.some(pattern => pattern.test(pathLower));
 }
@@ -190,7 +196,7 @@ async function analyzeFile(filePath) {
     return images.map(img => ({
       ...img,
       category: categorizeScreenshot(img.path),
-      needsReplacement: isLegacyScreenshot(img.path),
+      needsReplacement: needsReplacement(img.path),
     }));
   } catch (error) {
     console.error(`  ✗ Error reading ${filePath}: ${error.message}`);
@@ -384,12 +390,17 @@ async function main() {
     console.log('Configuration:');
     console.log(`  Docs path: ${config.docsPath}`);
     console.log(`  Output dir: ${config.outputDir}`);
+    console.log(`  Replace all: ${config.replaceAll}`);
     console.log('');
   }
 
   // Resolve and validate docs path
   const docsPath = path.resolve(config.docsPath);
   console.log(`Scanning: ${docsPath}`);
+  if (config.replaceAll) {
+    console.log('');
+    console.log('⚠ REPLACE_ALL mode: All screenshots will be flagged for replacement');
+  }
   console.log('');
 
   // Check if docs directory exists

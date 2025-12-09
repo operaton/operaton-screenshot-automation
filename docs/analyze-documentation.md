@@ -32,11 +32,12 @@ DEBUG=true npm run analyze
 
 The script reads configuration from environment variables (`.env` file) or command line arguments:
 
-| Variable     | Description                     | Default      |
-| ------------ | ------------------------------- | ------------ |
-| `DOCS_PATH`  | Path to documentation directory | `../../docs` |
-| `OUTPUT_DIR` | Directory for output files      | `./output`   |
-| `DEBUG`      | Enable verbose output           | `false`      |
+| Variable      | Description                                       | Default      |
+| ------------- | ------------------------------------------------- | ------------ |
+| `DOCS_PATH`   | Path to documentation directory                   | `../../docs` |
+| `OUTPUT_DIR`  | Directory for output files                        | `./output`   |
+| `REPLACE_ALL` | Flag all images for replacement (ignore patterns) | `false`      |
+| `DEBUG`       | Enable verbose output                             | `false`      |
 
 Command line argument takes precedence over environment variable:
 
@@ -87,30 +88,120 @@ DOCS_PATH=../documentation/docs
 DOCS_PATH=/home/user/projects/operaton/documentation/docs
 ```
 
-## Detection Patterns
+## Detection Logic
 
-### Categories
+The script uses two separate pattern sets: one for **categorization** (organizing screenshots) and
+one for **replacement detection** (flagging what needs updating).
 
-Screenshots are categorized based on path/filename patterns:
+### How Replacement Detection Works
 
-| Category | Patterns                                                                         | Description         |
-| -------- | -------------------------------------------------------------------------------- | ------------------- |
-| Cockpit  | `cockpit`, `dashboard`, `process-`, `decision-`, `batch`, `migration`, `heatmap` | Cockpit webapp      |
-| Tasklist | `tasklist`, `task-`, `filter`, `form`                                            | Tasklist webapp     |
-| Admin    | `admin-`, `user`, `group`, `tenant`, `authorization`, `system`                   | Admin webapp        |
-| Welcome  | `welcome`, `profile`                                                             | Welcome page        |
-| Modeler  | `modeler`, `diagram`, `bpmn-`                                                    | Modeler screenshots |
-| Other    | (none matched)                                                                   | Uncategorized       |
+A screenshot is flagged as "needs replacement" if its **file path or filename** matches any of these
+patterns:
 
-### Replacement Detection
+| Pattern              | Example Matches                                     |
+| -------------------- | --------------------------------------------------- |
+| `cockpit`            | `cockpit-dashboard.png`, `img/cockpit/overview.png` |
+| `tasklist`           | `tasklist-filter.png`, `tasklist/task-form.png`     |
+| `admin-`             | `admin-users.png`, `admin-system-settings.png`      |
+| `webapp`             | `webapp-login.png`                                  |
+| `dashboard`          | `dashboard-overview.png`                            |
+| `process-definition` | `process-definition-view.png`                       |
+| `process-instance`   | `process-instance-detail.png`                       |
+| `decision-`          | `decision-table.png`, `decision-definition.png`     |
+| `task-`              | `task-form.png`, `task-detail.png`                  |
+| `filter-`            | `filter-create.png`, `filter-settings.png`          |
+| `batch`              | `batch-operations.png`                              |
+| `migration`          | `migration-wizard.png`                              |
+| `cleanup`            | `cleanup-history.png`                               |
 
-Screenshots are flagged for replacement if their path contains any of these patterns:
+**Note:** Pattern matching is case-insensitive and checks the entire path, not just the filename.
 
-- `cockpit`, `tasklist`, `admin-`
-- `webapp`, `dashboard`
-- `process-definition`, `process-instance`
-- `decision-`, `task-`, `filter-`
-- `batch`, `migration`, `cleanup`
+### Examples
+
+| Image Reference                 | Needs Replacement? | Why                           |
+| ------------------------------- | ------------------ | ----------------------------- |
+| `../img/cockpit-dashboard.png`  | ✓ Yes              | Contains `cockpit`            |
+| `./images/tasklist/filters.png` | ✓ Yes              | Contains `tasklist`           |
+| `process-definition-list.png`   | ✓ Yes              | Contains `process-definition` |
+| `../img/bpmn-diagram.png`       | ✗ No               | No matching pattern           |
+| `logo.svg`                      | ✗ No               | No matching pattern           |
+| `architecture-overview.png`     | ✗ No               | No matching pattern           |
+
+### Why Some Screenshots Don't Need Replacement
+
+Screenshots categorized under "modeler" or "other" often don't need replacement because:
+
+- **Modeler screenshots** - BPMN/DMN diagrams are tool-agnostic
+- **Architecture diagrams** - Conceptual images not tied to UI
+- **Logos and icons** - Static assets
+- **External integrations** - Third-party tool screenshots
+
+### Customizing Detection Patterns
+
+The patterns are defined in `scripts/analyze-documentation.js` in the `LEGACY_PATTERNS` array. To
+add or modify patterns:
+
+```javascript
+const LEGACY_PATTERNS = [
+  /cockpit/i,
+  /tasklist/i,
+  // Add custom patterns here
+  /your-pattern/i,
+];
+```
+
+### Replace All Mode
+
+For a complete replacement of all screenshots (ignoring pattern detection), use:
+
+```bash
+# Via Make
+make analyze-all
+
+# Via environment variable
+REPLACE_ALL=true make analyze
+
+# Direct
+REPLACE_ALL=true node scripts/analyze-documentation.js
+```
+
+When `REPLACE_ALL=true`, every image reference is flagged for replacement regardless of its path or
+filename. This is useful when:
+
+- Starting fresh with a complete documentation overhaul
+- Ensuring visual consistency across all screenshots
+- Migrating to a new branding or theme
+
+Example output with `REPLACE_ALL=true`:
+
+```
+Scanning: /path/to/docs
+
+⚠ REPLACE_ALL mode: All screenshots will be flagged for replacement
+
+Found 413 markdown files
+Found 542 image references
+
+  Summary
+  Total screenshots:    542
+  Need replacement:     542    ← All images flagged
+```
+
+### Categories vs Replacement
+
+**Categorization** organizes screenshots for reporting purposes. **Replacement detection**
+determines what actually needs updating. These are independent:
+
+- A screenshot can be categorized as "cockpit" but NOT need replacement (if the pattern doesn't
+  match)
+- A screenshot can be categorized as "other" but still need replacement (if it matches a legacy
+  pattern)
+
+Example:
+
+- `other`: 138 total, **6 need replacement** (6 matched legacy patterns despite not fitting a
+  category)
+- `modeler`: 42 total, **0 need replacement** (BPMN diagrams don't need updating)
 
 ## Output Files
 

@@ -189,6 +189,10 @@ analyze-debug: ## Analyze documentation for screenshots to replace with debug ou
 	@printf "$(CYAN)Analyzing documentation (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
 
+analyze-all: ## Analyze documentation (flag ALL images for replacement) (MERGED)
+	@printf "$(CYAN)Analyzing documentation (replace all mode)...$(RESET)\n"
+	REPLACE_ALL=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
+
 #---------------------------------------------------------------------------
 # CLEANUP & RESET
 #---------------------------------------------------------------------------
