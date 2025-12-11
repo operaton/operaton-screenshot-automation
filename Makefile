@@ -8,7 +8,8 @@
 .PHONY: help install setup deploy data incidents simulate capture analyze reset clean all \
         check check-debug test test-check chaos-check chaos-check-debug status-debug \
 		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug \
-		deploy-debug chaos-deploy chaos-deploy-debug
+		deploy-debug chaos-deploy chaos-deploy-debug reset-debug reset-history chaos-reset \
+		chaos-reset-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -202,27 +203,35 @@ analyze-all: ## Analyze documentation (flag ALL images for replacement) (MERGED)
 # CLEANUP & RESET
 #---------------------------------------------------------------------------
 
-reset: ## Reset Operaton: delete all deployments, instances, and users
+reset: ## Reset Operaton: delete all deployments, instances, and users (MERGED)
 	@printf "$(RED)WARNING: This will delete ALL data from Operaton!$(RESET)\n"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	@printf "$(CYAN)Resetting Operaton environment...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js
 
-reset-instances: ## Delete all process instances only
+reset-instances: ## Delete all process instances only (MERGED)
 	@printf "$(CYAN)Deleting all process instances...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --instances-only
 
-reset-deployments: ## Delete all deployments only
+reset-deployments: ## Delete all deployments only (MERGED)
 	@printf "$(CYAN)Deleting all deployments...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --deployments-only
 
-reset-users: ## Delete created test users only
+reset-users: ## Delete created test users only (MERGED)
 	@printf "$(CYAN)Deleting test users...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --users-only
 
-reset-force: ## Force reset without confirmation prompt
+reset-force: ## Force reset without confirmation prompt (MERGED)
 	@printf "$(CYAN)Force resetting Operaton environment...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --force
+
+reset-debug: ## Reset environment with debug output (MERGED)
+	@printf "$(CYAN)Resetting environment (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/reset-environment.js --force
+
+reset-history: ## Reset only history data (MERGED)
+	@printf "$(CYAN)Resetting history data...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --force --history-only
 
 clean: ## Clean local output files (screenshots, reports)
 	@printf "$(CYAN)Cleaning output directory...$(RESET)\n"
@@ -257,12 +266,14 @@ test: ## Run all tests
 	$(NODE) tests/chaos-check-connection.js
 	$(NODE) tests/chaos-show-status.js
 	$(NODE) tests/chaos-deploy-processes.js
+	$(NODE) tests/chaos-reset-environment.js
 	@printf "$(GREEN)All tests passed$(RESET)\n"
 
 test-analyze: chaos-analyze ## Alias for chaos-analyze
 test-check: chaos-check ## Alias for chaos-check
 test-deploy: chaos-deploy ## Alias for chaos-deploy
 test-status: chaos-status ## Alias for chaos-status
+test-reset: chaos-reset ## Alias for chaos-reset
 
 chaos-analyze: ## Run chaos tests for analyze-documentation (MERGED)
 	@printf "$(CYAN)Running chaos tests for analyze-documentation...$(RESET)\n"
@@ -287,6 +298,14 @@ chaos-deploy: ## Run chaos tests for Deploy BPMN/DMN processes to Operaton (MERG
 chaos-deploy-debug: ## Run chaos tests for Deploy BPMN/DMN processes to Operaton with debug output (MERGED)
 	@printf "$(CYAN)Running chaos tests for deploy-processes (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-deploy-processes.js
+
+chaos-reset: ## Run chaos tests for Reset Operaton (MERGED)
+	@printf "$(CYAN)Running chaos tests for reset-environment...$(RESET)\n"
+	$(NODE) tests/chaos-reset-environment.js
+
+chaos-reset-debug: ## Run chaos tests for reset Operaton with debug output (MERGED)
+	@printf "$(CYAN)Running chaos tests for reset-environment (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-reset-environment.js
 
 chaos-status: ## Run chaos tests for showing current status of Operaton (MERGED)
 	@printf "$(CYAN)Running chaos tests for showing Operaton status...$(RESET)\n"
