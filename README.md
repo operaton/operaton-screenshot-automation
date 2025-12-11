@@ -99,14 +99,14 @@ Run `make help` to see all available commands:
 
 ### Cleanup & Reset
 
-| Command                  | Description                        |
-| ------------------------ | ---------------------------------- |
-| `make reset`             | Reset Operaton (with confirmation) |
-| `make reset-force`       | Reset without confirmation         |
-| `make reset-instances`   | Delete process instances only      |
-| `make reset-deployments` | Delete deployments only            |
-| `make clean`             | Clean local output files           |
-| `make wipe`              | Full wipe: reset + clean           |
+| Command                  | Description                        | Docs                            |
+| ------------------------ | ---------------------------------- | ------------------------------- |
+| `make reset`             | Reset Operaton (with confirmation) | [📖](docs/reset-environment.md) |
+| `make reset-force`       | Reset without confirmation         |                                 |
+| `make reset-instances`   | Delete process instances only      |                                 |
+| `make reset-deployments` | Delete deployments only            |                                 |
+| `make clean`             | Clean local output files           |                                 |
+| `make wipe`              | Full wipe: reset + clean           |                                 |
 
 ### Workflows
 
