@@ -9,7 +9,7 @@
         check check-debug test test-check chaos-check chaos-check-debug status-debug \
 		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug \
 		deploy-debug chaos-deploy chaos-deploy-debug reset-debug reset-history chaos-reset \
-		chaos-reset-debug
+		chaos-reset-debug data-debug chaos-data chaos-data-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -131,13 +131,13 @@ users: ## Create users and groups only
 	@printf "$(CYAN)Creating users and groups...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/generate-data.js --users-only
 
-data: ## Generate test data (users, process instances, tasks)
+data: ## Generate test data (users, process instances, tasks) (MERGED)
 	@printf "$(CYAN)Generating test data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/generate-data.js
 
-data-light: ## Generate minimal test data (fewer instances)
-	@printf "$(CYAN)Generating light test data...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/generate-data.js --light
+data-debug: ## Generate test data (users, process instances, tasks) with debug output (MERGED)
+	@printf "$(CYAN)Generating test data (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/generate-data.js
 
 simulate: ## Run simulation scenarios (tokens, history, tasks)
 	@printf "$(CYAN)Running simulation scenarios...$(RESET)\n"
@@ -266,6 +266,7 @@ test: ## Run all tests
 	$(NODE) tests/chaos-check-connection.js
 	$(NODE) tests/chaos-show-status.js
 	$(NODE) tests/chaos-deploy-processes.js
+	$(NODE) tests/chaos-generate-data.js
 	$(NODE) tests/chaos-reset-environment.js
 	@printf "$(GREEN)All tests passed$(RESET)\n"
 
@@ -274,6 +275,7 @@ test-check: chaos-check ## Alias for chaos-check
 test-deploy: chaos-deploy ## Alias for chaos-deploy
 test-status: chaos-status ## Alias for chaos-status
 test-reset: chaos-reset ## Alias for chaos-reset
+test-data: chaos-data ## Alias for chaos-data
 
 chaos-analyze: ## Run chaos tests for analyze-documentation (MERGED)
 	@printf "$(CYAN)Running chaos tests for analyze-documentation...$(RESET)\n"
@@ -290,6 +292,14 @@ chaos-check: ## Run chaos tests for checking Operaton instance (MERGED)
 chaos-check-debug: ## Run chaos tests for checking Operaton instance with debug output (MERGED)
 	@printf "$(CYAN)Running chaos tests for checking Operaton connection (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-check-connection.js
+
+chaos-data: ## Run chaos tests for generating test data (MERGED)
+	@printf "$(CYAN)Running chaos tests for generate-data...$(RESET)\n"
+	$(NODE) tests/chaos-generate-data.js
+
+chaos-data-debug: ## Run chaos tests for generating test data with debug output (MERGED)
+	@printf "$(CYAN)Running chaos tests for generate-data (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-generate-data.js
 
 chaos-deploy: ## Run chaos tests for Deploy BPMN/DMN processes to Operaton (MERGED)
 	@printf "$(CYAN)Running chaos tests for deploy-processes...$(RESET)\n"
