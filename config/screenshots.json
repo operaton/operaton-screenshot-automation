@@ -273,7 +273,7 @@
       "path": "#/groups",
       "outputFile": "documentation/webapps/admin/admin-groups.png",
       "requirements": {
-        "groups": ["camunda-admin", "accounting", "management", "sales"]
+        "groups": ["operaton-admin", "accounting", "management", "sales"]
       }
     },
     {
@@ -404,7 +404,7 @@
   ],
 
   "groups": [
-    { "id": "camunda-admin", "name": "Camunda Admin", "type": "SYSTEM" },
+    { "id": "operaton-admin", "name": "Operaton Admin", "type": "SYSTEM" },
     { "id": "accounting", "name": "Accounting", "type": "WORKFLOW" },
     { "id": "management", "name": "Management", "type": "WORKFLOW" },
     { "id": "sales", "name": "Sales", "type": "WORKFLOW" }

@@ -11,8 +11,6 @@
  * - Process instances (running and completed)
  * - User tasks (assigned and unassigned)
  * - Decision instances
- * - Failed jobs (for error screenshots)
- * - Batch operations
  */
 
 import 'dotenv/config';
@@ -22,14 +20,68 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, '../config/screenshots.json');
 
 // Configuration
 const config = {
   baseUrl: process.env.OPERATON_REST_URL || 'https://operaton-doc.open-regels.nl/engine-rest',
+  webUrl: process.env.OPERATON_BASE_URL || 'https://operaton-doc.open-regels.nl',
   username: process.env.OPERATON_USERNAME || 'demo',
   password: process.env.OPERATON_PASSWORD || 'demo',
+  configPath: process.env.CONFIG_PATH || path.join(__dirname, '..', 'config', 'screenshots.json'),
 };
+
+/**
+ * Log debug information if DEBUG mode is enabled
+ * @param {string} message - Debug message
+ */
+function debug(message) {
+  if (process.env.DEBUG === 'true') {
+    console.log(`    [DEBUG] ${message}`);
+  }
+}
+
+/**
+ * Get error message from axios error
+ * @param {Error} error - Axios error
+ * @returns {string} - Error message
+ */
+function getErrorMessage(error) {
+  if (error.response) {
+    const { status = 0 } = error.response;
+    const message = error.response.data?.message;
+    if (message) {
+      // Show more of the message for debugging
+      const truncated = message.length > 200 ? `${message.substring(0, 200)}...` : message;
+      return `${truncated} (HTTP ${status})`;
+    }
+    switch (status) {
+      case 400:
+        return 'Bad request';
+      case 401:
+        return 'Authentication failed';
+      case 403:
+        return 'Access forbidden';
+      case 404:
+        return 'Not found';
+      case 500:
+        return 'Server error';
+      default:
+        return `HTTP ${status}`;
+    }
+  } else if (error.code) {
+    switch (error.code) {
+      case 'ECONNREFUSED':
+        return 'Connection refused - is Operaton running?';
+      case 'ENOTFOUND':
+        return 'Host not found';
+      case 'ETIMEDOUT':
+        return 'Connection timed out';
+      default:
+        return error.code;
+    }
+  }
+  return error.message;
+}
 
 // API client
 const api = axios.create({
@@ -42,18 +94,77 @@ const api = axios.create({
     Accept: 'application/json',
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 });
 
-// Track created resources for cleanup
-const createdResources = {
-  users: [],
-  groups: [],
-  processInstances: [],
-  tasks: [],
+// Track created resources
+const stats = {
+  users: { created: 0, existed: 0, failed: 0 },
+  groups: { created: 0, existed: 0, failed: 0 },
+  instances: { created: 0, completed: 0, failed: 0 },
+  decisions: { evaluated: 0, failed: 0 },
+  tasks: { completed: 0, failed: 0 },
 };
 
 /**
+ * Delay helper
+ * @param {number} ms - Milliseconds to delay
+ * @returns {Promise<void>}
+ */
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Check connection to Operaton
+ * @returns {Promise<{connected: boolean, engine?: string, error?: string}>}
+ */
+async function checkConnection() {
+  try {
+    const response = await api.get('/engine');
+    const engines = response.data;
+    if (Array.isArray(engines) && engines.length > 0) {
+      return { connected: true, engine: engines[0].name };
+    }
+    return { connected: false, error: 'No engines found' };
+  } catch (error) {
+    return { connected: false, error: getErrorMessage(error) };
+  }
+}
+
+/**
+ * Load configuration file
+ * @returns {Promise<Object|null>}
+ */
+async function loadConfig() {
+  try {
+    const configPath = path.resolve(config.configPath);
+    debug(`Loading config from: ${configPath}`);
+
+    const content = await fs.readFile(configPath, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.log(`✗ Configuration file not found: ${config.configPath}`);
+      console.log('');
+      console.log('Troubleshooting:');
+      console.log('  1. Create config/screenshots.json with user/group definitions');
+      console.log('  2. Or set CONFIG_PATH environment variable');
+    } else if (error instanceof SyntaxError) {
+      console.log(`✗ Invalid JSON in configuration file: ${error.message}`);
+    } else {
+      console.log(`✗ Error loading configuration: ${error.message}`);
+    }
+    return null;
+  }
+}
+
+// ============================================================================
+// USER AND GROUP FUNCTIONS
+// ============================================================================
+
+/**
  * Create a user
+ * @param {Object} userData - User data
+ * @returns {Promise<Object|null>}
  */
 async function createUser(userData) {
   try {
@@ -61,10 +172,11 @@ async function createUser(userData) {
     const existing = await api.get(`/user/${userData.id}/profile`).catch(() => null);
     if (existing?.data) {
       console.log(`  ⊘ User ${userData.id} already exists`);
+      stats.users.existed++;
       return existing.data;
     }
 
-    const response = await api.post('/user/create', {
+    await api.post('/user/create', {
       profile: {
         id: userData.id,
         firstName: userData.firstName,
@@ -77,26 +189,24 @@ async function createUser(userData) {
     });
 
     console.log(`  ✓ Created user: ${userData.id}`);
-    createdResources.users.push(userData.id);
-    return response.data;
+    stats.users.created++;
+    return userData;
   } catch (error) {
-    if (
-      error.response?.status === 500 &&
-      error.response?.data?.message?.includes('already exists')
-    ) {
+    if (error.response?.data?.message?.includes('already exists')) {
       console.log(`  ⊘ User ${userData.id} already exists`);
+      stats.users.existed++;
       return null;
     }
-    console.error(
-      `  ✗ Failed to create user ${userData.id}:`,
-      error.response?.data?.message || error.message
-    );
+    console.log(`  ✗ Failed to create user ${userData.id}: ${getErrorMessage(error)}`);
+    stats.users.failed++;
     return null;
   }
 }
 
 /**
  * Create a group
+ * @param {Object} groupData - Group data
+ * @returns {Promise<Object|null>}
  */
 async function createGroup(groupData) {
   try {
@@ -104,54 +214,143 @@ async function createGroup(groupData) {
     const existing = await api.get(`/group/${groupData.id}`).catch(() => null);
     if (existing?.data) {
       console.log(`  ⊘ Group ${groupData.id} already exists`);
+      stats.groups.existed++;
       return existing.data;
     }
 
-    const response = await api.post('/group/create', {
+    await api.post('/group/create', {
       id: groupData.id,
       name: groupData.name,
       type: groupData.type || 'WORKFLOW',
     });
 
     console.log(`  ✓ Created group: ${groupData.id}`);
-    createdResources.groups.push(groupData.id);
-    return response.data;
+    stats.groups.created++;
+    return groupData;
   } catch (error) {
-    if (
-      error.response?.status === 500 &&
-      error.response?.data?.message?.includes('already exists')
-    ) {
+    if (error.response?.data?.message?.includes('already exists')) {
       console.log(`  ⊘ Group ${groupData.id} already exists`);
+      stats.groups.existed++;
       return null;
     }
-    console.error(
-      `  ✗ Failed to create group ${groupData.id}:`,
-      error.response?.data?.message || error.message
-    );
+    console.log(`  ✗ Failed to create group ${groupData.id}: ${getErrorMessage(error)}`);
+    stats.groups.failed++;
     return null;
   }
 }
 
 /**
  * Add user to group
+ * @param {string} userId - User ID
+ * @param {string} groupId - Group ID
  */
 async function addUserToGroup(userId, groupId) {
   try {
+    // Check if already a member
+    const members = await api.get(`/group/${groupId}/members`).catch(() => ({ data: [] }));
+    if (members.data.some(m => m.id === userId)) {
+      debug(`${userId} is already a member of ${groupId}`);
+      return;
+    }
+
     await api.put(`/group/${groupId}/members/${userId}`);
     console.log(`  ✓ Added ${userId} to group ${groupId}`);
   } catch (error) {
-    // Ignore if already member
-    if (!error.response?.data?.message?.includes('already member')) {
-      console.error(
-        `  ✗ Failed to add ${userId} to ${groupId}:`,
-        error.response?.data?.message || error.message
-      );
+    debug(`Could not add ${userId} to ${groupId}: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Setup users and groups
+ * @param {Object} configData - Configuration data
+ */
+async function setupUsersAndGroups(configData) {
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Creating Users');
+  console.log('─'.repeat(50));
+
+  if (configData.users && configData.users.length > 0) {
+    for (const user of configData.users) {
+      await createUser(user);
+      await delay(100);
     }
+  } else {
+    console.log('  No users defined in configuration');
+  }
+
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Creating Groups');
+  console.log('─'.repeat(50));
+
+  if (configData.groups && configData.groups.length > 0) {
+    for (const group of configData.groups) {
+      await createGroup(group);
+      await delay(100);
+    }
+  } else {
+    console.log('  No groups defined in configuration');
+  }
+
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Adding Users to Groups');
+  console.log('─'.repeat(50));
+
+  // Add users to groups based on configuration
+  if (configData.memberships) {
+    for (const membership of configData.memberships) {
+      await addUserToGroup(membership.userId, membership.groupId);
+      await delay(100);
+    }
+  } else {
+    // Default memberships
+    await addUserToGroup('demo', 'operaton-admin');
+    await addUserToGroup('john', 'accounting');
+    await addUserToGroup('mary', 'management');
+    await addUserToGroup('peter', 'sales');
+  }
+}
+
+// ============================================================================
+// PROCESS AND DECISION FUNCTIONS
+// ============================================================================
+
+/**
+ * Get process definitions
+ * @returns {Promise<Array>}
+ */
+async function getProcessDefinitions() {
+  try {
+    const response = await api.get('/process-definition', { params: { latestVersion: true } });
+    return response.data;
+  } catch (error) {
+    debug(`Failed to get process definitions: ${getErrorMessage(error)}`);
+    return [];
+  }
+}
+
+/**
+ * Get decision definitions
+ * @returns {Promise<Array>}
+ */
+async function getDecisionDefinitions() {
+  try {
+    const response = await api.get('/decision-definition', { params: { latestVersion: true } });
+    return response.data;
+  } catch (error) {
+    debug(`Failed to get decision definitions: ${getErrorMessage(error)}`);
+    return [];
   }
 }
 
 /**
  * Start a process instance
+ * @param {string} processKey - Process definition key
+ * @param {Object} variables - Process variables
+ * @param {string} businessKey - Business key
+ * @returns {Promise<Object|null>}
  */
 async function startProcessInstance(processKey, variables = {}, businessKey = null) {
   try {
@@ -170,51 +369,37 @@ async function startProcessInstance(processKey, variables = {}, businessKey = nu
 
     const response = await api.post(`/process-definition/key/${processKey}/start`, payload);
 
-    console.log(`  ✓ Started process: ${processKey} (${response.data.id})`);
-    createdResources.processInstances.push(response.data.id);
+    debug(`Started ${processKey}: ${response.data.id}`);
+    console.log(`  ✓ Started process: ${processKey} (${response.data.id.substring(0, 8)}...)`);
+    stats.instances.created++;
     return response.data;
   } catch (error) {
-    console.error(
-      `  ✗ Failed to start ${processKey}:`,
-      error.response?.data?.message || error.message
-    );
+    console.log(`  ✗ Failed to start ${processKey}: ${getErrorMessage(error)}`);
+    stats.instances.failed++;
     return null;
   }
 }
 
 /**
- * Get tasks for a user
+ * Get tasks
+ * @param {Object} params - Query parameters
+ * @returns {Promise<Array>}
  */
-async function getTasks(assignee = null, candidateGroup = null) {
+async function getTasks(params = {}) {
   try {
-    const params = {};
-    if (assignee) params.assignee = assignee;
-    if (candidateGroup) params.candidateGroup = candidateGroup;
-
     const response = await api.get('/task', { params });
     return response.data;
   } catch (error) {
-    console.error('Failed to get tasks:', error.response?.data?.message || error.message);
+    debug(`Failed to get tasks: ${getErrorMessage(error)}`);
     return [];
   }
 }
 
 /**
- * Claim a task
- */
-async function _claimTask(taskId, userId) {
-  try {
-    await api.post(`/task/${taskId}/claim`, { userId });
-    console.log(`  ✓ Claimed task ${taskId} for ${userId}`);
-    return true;
-  } catch (error) {
-    console.error(`  ✗ Failed to claim task:`, error.response?.data?.message || error.message);
-    return false;
-  }
-}
-
-/**
  * Complete a task
+ * @param {string} taskId - Task ID
+ * @param {Object} variables - Task variables
+ * @returns {Promise<boolean>}
  */
 async function completeTask(taskId, variables = {}) {
   try {
@@ -226,42 +411,21 @@ async function completeTask(taskId, variables = {}) {
         ])
       ),
     });
-    console.log(`  ✓ Completed task ${taskId}`);
+    debug(`Completed task ${taskId}`);
+    stats.tasks.completed++;
     return true;
   } catch (error) {
-    console.error(`  ✗ Failed to complete task:`, error.response?.data?.message || error.message);
+    debug(`Failed to complete task ${taskId}: ${getErrorMessage(error)}`);
+    stats.tasks.failed++;
     return false;
   }
 }
 
 /**
- * Get process definitions
- */
-async function getProcessDefinitions() {
-  try {
-    const response = await api.get('/process-definition', { params: { latestVersion: true } });
-    return response.data;
-  } catch (error) {
-    console.error('Failed to get process definitions:', error.message);
-    return [];
-  }
-}
-
-/**
- * Get decision definitions
- */
-async function getDecisionDefinitions() {
-  try {
-    const response = await api.get('/decision-definition', { params: { latestVersion: true } });
-    return response.data;
-  } catch (error) {
-    console.error('Failed to get decision definitions:', error.message);
-    return [];
-  }
-}
-
-/**
  * Evaluate a decision
+ * @param {string} decisionKey - Decision definition key
+ * @param {Object} variables - Decision variables
+ * @returns {Promise<Object|null>}
  */
 async function evaluateDecision(decisionKey, variables) {
   try {
@@ -273,91 +437,88 @@ async function evaluateDecision(decisionKey, variables) {
         ])
       ),
     });
+    debug(`Evaluated decision ${decisionKey}`);
     console.log(`  ✓ Evaluated decision: ${decisionKey}`);
+    stats.decisions.evaluated++;
     return response.data;
   } catch (error) {
-    console.error(
-      `  ✗ Failed to evaluate ${decisionKey}:`,
-      error.response?.data?.message || error.message
-    );
+    console.log(`  ✗ Failed to evaluate ${decisionKey}: ${getErrorMessage(error)}`);
+    stats.decisions.failed++;
     return null;
   }
 }
 
+// ============================================================================
+// TEST SCENARIOS
+// ============================================================================
+
 /**
- * Create test scenario data
+ * Create test scenarios
  */
-async function createTestScenarios(_configData) {
-  const scenarios = {
-    simpleWorkflow: {
-      description: 'Basic workflow with tasks',
-      instances: 5,
-    },
-    completedWorkflows: {
-      description: 'Completed process instances for history',
-      instances: 10,
-    },
-    tasksForDemo: {
-      description: 'Tasks assigned to demo user',
-      count: 5,
-    },
-  };
-
-  const results = {
-    instances: [],
-    tasks: [],
-    decisions: [],
-  };
-
+async function createTestScenarios() {
   // Get available process definitions
   const definitions = await getProcessDefinitions();
-  console.log(`\nFound ${definitions.length} process definition(s)`);
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Process Definitions');
+  console.log('─'.repeat(50));
+  console.log(`  Found ${definitions.length} process definition(s)`);
 
   if (definitions.length === 0) {
-    console.log('⚠ No process definitions found. Run deploy-processes.js first.');
-    return results;
+    console.log('');
+    console.log('⚠ No process definitions found');
+    console.log('');
+    console.log('Run "make deploy" first to deploy processes.');
+    return;
+  }
+
+  for (const def of definitions) {
+    console.log(`    - ${def.name || def.key} (${def.key})`);
   }
 
   // Find invoice process (or use first available)
   const invoiceProcess = definitions.find(d => d.key === 'invoice') || definitions[0];
 
-  console.log(`\n📋 Creating scenarios with process: ${invoiceProcess.key}`);
+  // Scenario 1: Active instances
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Creating Active Process Instances');
+  console.log('─'.repeat(50));
 
-  // Scenario 1: Create active instances
-  console.log('\n--- Scenario: Active Process Instances ---');
-  for (let i = 0; i < scenarios.simpleWorkflow.instances; i++) {
-    const instance = await startProcessInstance(
+  const categories = ['Travel Expenses', 'Misc', 'Software License'];
+  const approvers = ['john', 'mary', 'peter', 'demo', 'john'];
+  for (let i = 0; i < 5; i++) {
+    await startProcessInstance(
       invoiceProcess.key,
       {
         amount: Math.floor(Math.random() * 2000) + 100,
         creditor: `Vendor ${i + 1}`,
         invoiceNumber: `INV-${Date.now()}-${i}`,
-        invoiceCategory: ['Travel Expenses', 'Misc', 'Software License'][i % 3],
+        invoiceCategory: categories[i % 3],
+        approver: approvers[i],
       },
       `BK-${Date.now()}-${i}`
     );
-
-    if (instance) {
-      results.instances.push(instance);
-    }
-
-    // Small delay to avoid overwhelming the server
-    await new Promise(r => setTimeout(r, 200));
+    await delay(200);
   }
 
-  // Scenario 2: Create and complete some instances
-  console.log('\n--- Scenario: Completed Process Instances ---');
-  for (let i = 0; i < Math.min(3, scenarios.completedWorkflows.instances); i++) {
+  // Scenario 2: Completed instances
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Creating Completed Process Instances');
+  console.log('─'.repeat(50));
+
+  for (let i = 0; i < 3; i++) {
     const instance = await startProcessInstance(invoiceProcess.key, {
       amount: 150, // Low amount for auto-approval
       creditor: `Completed Vendor ${i + 1}`,
       invoiceNumber: `INV-COMP-${Date.now()}-${i}`,
       invoiceCategory: 'Misc',
+      approver: 'demo',
     });
 
     if (instance) {
-      // Wait for task to be created
-      await new Promise(r => setTimeout(r, 500));
+      await delay(500);
 
       // Get and complete the first task
       const tasks = await getTasks();
@@ -365,120 +526,152 @@ async function createTestScenarios(_configData) {
 
       if (instanceTask) {
         await completeTask(instanceTask.id, { approved: true });
+        stats.instances.completed++;
+        console.log(`    ✓ Completed instance ${instance.id.substring(0, 8)}...`);
       }
     }
-
-    await new Promise(r => setTimeout(r, 200));
+    await delay(200);
   }
 
-  // Get decision definitions
+  // Scenario 3: Decision evaluations
   const decisions = await getDecisionDefinitions();
-  console.log(`\nFound ${decisions.length} decision definition(s)`);
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Decision Definitions');
+  console.log('─'.repeat(50));
+  console.log(`  Found ${decisions.length} decision definition(s)`);
 
-  // Evaluate some decisions
+  for (const def of decisions) {
+    console.log(`    - ${def.name || def.key} (${def.key})`);
+  }
+
   if (decisions.length > 0) {
-    console.log('\n--- Scenario: Decision Instances ---');
-    const invoiceDecision =
-      decisions.find(d => d.key === 'invoice-assign-approver') || decisions[0];
+    console.log('');
+    console.log('─'.repeat(50));
+    console.log('  Evaluating Decisions');
+    console.log('─'.repeat(50));
 
-    for (let i = 0; i < 3; i++) {
-      const result = await evaluateDecision(invoiceDecision.key, {
-        amount: [100, 500, 1000][i],
-        invoiceCategory: 'Travel Expenses',
-      });
+    const invoiceDecision = decisions.find(d => d.key === 'invoice-assign-approver');
 
-      if (result) {
-        results.decisions.push(result);
+    if (invoiceDecision) {
+      const amounts = [100, 500, 1500];
+      for (const amount of amounts) {
+        await evaluateDecision(invoiceDecision.key, {
+          amount,
+          invoiceCategory: 'Travel Expenses',
+        });
+        await delay(200);
       }
-
-      await new Promise(r => setTimeout(r, 200));
+    } else {
+      console.log('  ⊘ Invoice assign approver decision not found, skipping evaluations');
     }
   }
-
-  return results;
 }
 
-/**
- * Setup users and groups
- */
-async function setupUsersAndGroups(configData) {
-  console.log('\n👥 Creating users...');
+// ============================================================================
+// MAIN EXECUTION
+// ============================================================================
 
-  for (const user of configData.users) {
-    await createUser(user);
-    await new Promise(r => setTimeout(r, 100));
-  }
-
-  console.log('\n👥 Creating groups...');
-
-  for (const group of configData.groups) {
-    await createGroup(group);
-    await new Promise(r => setTimeout(r, 100));
-  }
-
-  // Add users to groups
-  console.log('\n🔗 Adding users to groups...');
-
-  // Demo user to camunda-admin
-  await addUserToGroup('demo', 'camunda-admin');
-  await addUserToGroup('john', 'accounting');
-  await addUserToGroup('mary', 'management');
-  await addUserToGroup('peter', 'sales');
-}
-
-/**
- * Generate summary report
- */
-function generateReport(results) {
-  console.log(`\n${'═'.repeat(60)}`);
-  console.log('  Data Generation Summary');
-  console.log('═'.repeat(60));
-  console.log(`  Users created:     ${createdResources.users.length}`);
-  console.log(`  Groups created:    ${createdResources.groups.length}`);
-  console.log(`  Process instances: ${results.instances.length}`);
-  console.log(`  Decisions evaluated: ${results.decisions.length}`);
-  console.log(`${'═'.repeat(60)}\n`);
-}
-
-/**
- * Main execution
- */
 async function main() {
   console.log('═'.repeat(60));
   console.log('  Operaton Test Data Generator');
   console.log('═'.repeat(60));
-  console.log(`\nTarget: ${config.baseUrl}\n`);
+  console.log('');
 
-  // Load configuration
-  const configData = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf8'));
+  if (process.env.DEBUG === 'true') {
+    console.log('Configuration:');
+    console.log(`  REST URL: ${config.baseUrl}`);
+    console.log(`  Web URL: ${config.webUrl}`);
+    console.log(`  Username: ${config.username}`);
+    console.log(`  Password: ${'*'.repeat(config.password.length)}`);
+    console.log('');
+  }
 
-  // Test connection
-  try {
-    await api.get('/engine');
-    console.log('✓ Connected to Operaton\n');
-  } catch (error) {
-    console.error('✗ Failed to connect to Operaton:', error.message);
+  console.log(`Target: ${config.baseUrl}`);
+  console.log('');
+
+  // Check connection
+  const connection = await checkConnection();
+  if (!connection.connected) {
+    console.log(`✗ Cannot connect to Operaton: ${connection.error}`);
+    console.log('');
+    console.log('Troubleshooting:');
+    console.log('  1. Run "make check" for detailed connection diagnostics');
+    console.log('  2. Verify Operaton is running');
+    console.log('  3. Check .env file configuration');
     process.exit(1);
   }
+
+  console.log(`✓ Connected to engine: ${connection.engine}`);
+
+  // Load configuration
+  const configData = await loadConfig();
+  if (!configData) {
+    process.exit(1);
+  }
+
+  debug(
+    `Config loaded with ${configData.users?.length || 0} users, ${configData.groups?.length || 0} groups`
+  );
 
   // Setup users and groups
   await setupUsersAndGroups(configData);
 
   // Create test scenarios
-  console.log('\n📊 Creating test scenarios...');
-  const results = await createTestScenarios(configData);
+  await createTestScenarios();
 
   // Print summary
-  generateReport(results);
-
-  // Show next steps
-  console.log('Next steps:');
-  console.log('  1. Verify data in Operaton webapps');
-  console.log('  2. Run: npm run capture-screenshots');
   console.log('');
+  console.log('═'.repeat(60));
+  console.log('  Data Generation Summary');
+  console.log('═'.repeat(60));
+  console.log(
+    `  Users:     ${stats.users.created} created, ${stats.users.existed} existed, ${stats.users.failed} failed`
+  );
+  console.log(
+    `  Groups:    ${stats.groups.created} created, ${stats.groups.existed} existed, ${stats.groups.failed} failed`
+  );
+  console.log(
+    `  Instances: ${stats.instances.created} created, ${stats.instances.completed} completed, ${stats.instances.failed} failed`
+  );
+  console.log(
+    `  Decisions: ${stats.decisions.evaluated} evaluated, ${stats.decisions.failed} failed`
+  );
+  console.log('═'.repeat(60));
+
+  // Check for failures (only count user/group failures as critical)
+  const criticalFailures = stats.users.failed + stats.groups.failed;
+  const totalFailures = criticalFailures + stats.instances.failed + stats.decisions.failed;
+
+  if (totalFailures > 0) {
+    console.log('');
+    if (criticalFailures > 0) {
+      console.log(`✗ Completed with ${criticalFailures} critical failure(s)`);
+    } else {
+      console.log(
+        `⚠ Completed with ${stats.instances.failed} instance failure(s) (processes may not be deployed)`
+      );
+    }
+  } else {
+    console.log('');
+    console.log('✓ Data generation complete');
+  }
+
+  console.log('');
+  console.log('Next steps:');
+  console.log('  make status     # Verify data in Operaton');
+  console.log('  make capture    # Capture screenshots');
+
+  // Exit with error only if user/group creation failed
+  if (criticalFailures > 0) {
+    process.exit(1);
+  }
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err);
+  console.error('Unexpected error:', err.message);
+  if (process.env.DEBUG === 'true') {
+    console.error(err.stack);
+  }
   process.exit(1);
 });
