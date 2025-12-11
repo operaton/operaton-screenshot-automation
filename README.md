@@ -63,12 +63,12 @@ Run `make help` to see all available commands:
 
 ### Deployment & Data
 
-| Command           | Description                  |
-| ----------------- | ---------------------------- |
-| `make deploy`     | Deploy BPMN/DMN processes    |
-| `make users`      | Create users and groups only |
-| `make data`       | Generate full test data      |
-| `make data-light` | Generate minimal test data   |
+| Command           | Description                  | Docs                           |
+| ----------------- | ---------------------------- | ------------------------------ |
+| `make deploy`     | Deploy BPMN/DMN processes    | [📖](docs/deploy-processes.md) |
+| `make users`      | Create users and groups only |                                |
+| `make data`       | Generate full test data      |                                |
+| `make data-light` | Generate minimal test data   |                                |
 
 ### Simulation Scenarios
 
