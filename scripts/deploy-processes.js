@@ -18,16 +18,76 @@ import FormData from 'form-data';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { glob } from 'glob';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, '../config/screenshots.json');
 
-// Configuration
 const config = {
   baseUrl: process.env.OPERATON_REST_URL || 'https://operaton-doc.open-regels.nl/engine-rest',
+  webUrl: process.env.OPERATON_BASE_URL || 'https://operaton-doc.open-regels.nl',
   username: process.env.OPERATON_USERNAME || 'demo',
   password: process.env.OPERATON_PASSWORD || 'demo',
+  processesDir: process.env.PROCESSES_DIR || path.join(__dirname, '..', 'processes'),
+  deploymentSource: process.env.DEPLOYMENT_SOURCE || 'screenshot-automation',
 };
+
+/**
+ * Log debug information if DEBUG mode is enabled
+ * @param {string} message - Debug message
+ */
+function debug(message) {
+  if (process.env.DEBUG === 'true') {
+    console.log(`    [DEBUG] ${message}`);
+  }
+}
+
+/**
+ * Get error message from axios error
+ * @param {Error} error - Axios error
+ * @returns {string} - Error message
+ */
+function getErrorMessage(error) {
+  if (error.response) {
+    const { status = 0 } = error.response;
+    switch (status) {
+      case 400:
+        return 'Bad request - check file format';
+      case 401:
+        return 'Authentication failed';
+      case 403:
+        return 'Access forbidden';
+      case 404:
+        return 'Endpoint not found';
+      case 500:
+        return 'Server error';
+      case 502:
+        return 'Bad gateway';
+      case 503:
+        return 'Service unavailable';
+      default:
+        if (status > 0) {
+          return `HTTP ${status}`;
+        }
+        // Check for error message in response body
+        if (error.response.data?.message) {
+          return error.response.data.message.substring(0, 100);
+        }
+        return 'Unknown HTTP error';
+    }
+  } else if (error.code) {
+    switch (error.code) {
+      case 'ECONNREFUSED':
+        return 'Connection refused - is Operaton running?';
+      case 'ENOTFOUND':
+        return 'Host not found';
+      case 'ETIMEDOUT':
+        return 'Connection timed out';
+      default:
+        return error.code;
+    }
+  }
+  return error.message;
+}
 
 // Create axios instance with auth
 const api = axios.create({
@@ -39,268 +99,222 @@ const api = axios.create({
   headers: {
     Accept: 'application/json',
   },
+  timeout: 30000,
 });
 
 /**
  * Check if Operaton is accessible
+ * @returns {Promise<{connected: boolean, engine?: string, error?: string}>}
  */
 async function checkConnection() {
   try {
     const response = await api.get('/engine');
-    console.log('✓ Connected to Operaton');
-    console.log(`  Engine: ${response.data[0]?.name || 'default'}`);
-    return true;
-  } catch (error) {
-    console.error('✗ Failed to connect to Operaton:', error.message);
-    if (error.response) {
-      console.error(`  Status: ${error.response.status}`);
-      console.error(`  Response: ${JSON.stringify(error.response.data)}`);
+    const engines = response.data;
+    if (Array.isArray(engines) && engines.length > 0) {
+      return { connected: true, engine: engines[0].name };
     }
-    return false;
+    return { connected: false, error: 'No engines found' };
+  } catch (error) {
+    return { connected: false, error: getErrorMessage(error) };
   }
 }
 
 /**
  * Get existing deployments
+ * @returns {Promise<Array>}
  */
 async function getExistingDeployments() {
   try {
     const response = await api.get('/deployment');
     return response.data;
   } catch (error) {
-    console.error('Failed to get deployments:', error.message);
+    debug(`Failed to get deployments: ${getErrorMessage(error)}`);
     return [];
   }
 }
 
 /**
  * Deploy a single process file
+ * @param {Object} processConfig - Process configuration
+ * @param {string} filePath - Path to the file
+ * @returns {Promise<Object|null>}
  */
 async function deployProcess(processConfig, filePath) {
   const form = new FormData();
 
-  // Read the file
-  const fileContent = await fs.readFile(filePath);
-  const fileName = path.basename(filePath);
-
-  // Add file to form
-  form.append('upload', fileContent, {
-    filename: fileName,
-    contentType: 'application/octet-stream',
-  });
-
-  // Deployment metadata
-  form.append('deployment-name', processConfig.name);
-  form.append('enable-duplicate-filtering', 'true');
-  form.append('deploy-changed-only', 'true');
-
   try {
+    // Read the file
+    const fileContent = await fs.readFile(filePath);
+    const fileName = path.basename(filePath);
+
+    debug(`Deploying file: ${fileName} (${fileContent.length} bytes)`);
+
+    // Add file to form
+    form.append('upload', fileContent, {
+      filename: fileName,
+      contentType: 'application/octet-stream',
+    });
+
+    // Deployment metadata
+    form.append('deployment-name', processConfig.name);
+    form.append('deployment-source', config.deploymentSource);
+    form.append('enable-duplicate-filtering', 'true');
+    form.append('deploy-changed-only', 'true');
+
     const response = await api.post('/deployment/create', form, {
       headers: {
         ...form.getHeaders(),
       },
+      timeout: 60000, // Longer timeout for deployment
     });
+
+    const processCount = Object.keys(response.data.deployedProcessDefinitions || {}).length;
+    const decisionCount = Object.keys(response.data.deployedDecisionDefinitions || {}).length;
+    const caseCount = Object.keys(response.data.deployedCaseDefinitions || {}).length;
 
     console.log(`  ✓ Deployed: ${processConfig.name}`);
     console.log(`    ID: ${response.data.id}`);
-    console.log(
-      `    Resources: ${Object.keys(response.data.deployedProcessDefinitions || {}).length} process(es)`
-    );
+
+    if (processCount > 0) console.log(`    Processes: ${processCount}`);
+    if (decisionCount > 0) console.log(`    Decisions: ${decisionCount}`);
+    if (caseCount > 0) console.log(`    Cases: ${caseCount}`);
 
     return response.data;
   } catch (error) {
-    console.error(`  ✗ Failed to deploy ${processConfig.name}:`, error.message);
-    if (error.response) {
-      console.error(`    ${JSON.stringify(error.response.data)}`);
+    console.log(`  ✗ Failed to deploy ${processConfig.name}: ${getErrorMessage(error)}`);
+    if (error.response?.data && process.env.DEBUG === 'true') {
+      console.log(`    Response: ${JSON.stringify(error.response.data).substring(0, 200)}`);
     }
     return null;
   }
 }
 
 /**
- * Deploy all processes from config
+ * Discover process files in directory
+ * @param {string} dir - Directory to scan
+ * @param {string} extension - File extension to find
+ * @returns {Promise<Array<{name: string, file: string, path: string}>>}
+ */
+async function discoverFiles(dir, extension) {
+  const pattern = path.join(dir, '**', `*.${extension}`).replace(/\\/g, '/');
+  debug(`Scanning for ${extension} files: ${pattern}`);
+
+  try {
+    const files = await glob(pattern);
+    return files.map(filePath => {
+      const fileName = path.basename(filePath, `.${extension}`);
+      // Create a readable name from filename
+      const name = fileName
+        .replace(/-/g, ' ')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+      return {
+        name,
+        file: path.relative(path.join(__dirname, '..'), filePath),
+        path: filePath,
+      };
+    });
+  } catch (error) {
+    debug(`Error scanning for ${extension} files: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Check if processes directory exists
+ * @returns {Promise<boolean>}
+ */
+async function checkProcessesDir() {
+  try {
+    const stats = await fs.stat(config.processesDir);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Deploy all discovered processes
+ * @returns {Promise<Object>}
  */
 async function deployAllProcesses() {
-  const configData = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf8'));
   const results = {
     deployed: [],
     failed: [],
     skipped: [],
   };
 
-  console.log('\n📦 Deploying BPMN Processes...\n');
+  // Discover BPMN files
+  const bpmnFiles = await discoverFiles(config.processesDir, 'bpmn');
+  if (bpmnFiles.length > 0) {
+    console.log('');
+    console.log('─'.repeat(50));
+    console.log('  Deploying BPMN Processes');
+    console.log('─'.repeat(50));
 
-  // Deploy BPMN processes
-  for (const [key, process] of Object.entries(configData.processes)) {
-    const filePath = path.join(__dirname, '..', process.file);
-
-    // Check if file exists
-    try {
-      await fs.access(filePath);
-    } catch {
-      console.log(`  ⊘ Skipping ${process.name}: File not found (${process.file})`);
-      results.skipped.push({ key, reason: 'File not found' });
-      continue;
-    }
-
-    const result = await deployProcess(process, filePath);
-    if (result) {
-      results.deployed.push({ key, ...result });
-    } else {
-      results.failed.push({ key, name: process.name });
+    for (const process of bpmnFiles) {
+      const result = await deployProcess(process, process.path);
+      if (result) {
+        results.deployed.push({ key: process.name, ...result });
+      } else {
+        results.failed.push({ key: process.name, name: process.name });
+      }
     }
   }
 
-  console.log('\n📊 Deploying DMN Decisions...\n');
+  // Discover DMN files
+  const dmnFiles = await discoverFiles(config.processesDir, 'dmn');
+  if (dmnFiles.length > 0) {
+    console.log('');
+    console.log('─'.repeat(50));
+    console.log('  Deploying DMN Decisions');
+    console.log('─'.repeat(50));
 
-  // Deploy DMN decisions
-  for (const [key, decision] of Object.entries(configData.decisions)) {
-    const filePath = path.join(__dirname, '..', decision.file);
-
-    try {
-      await fs.access(filePath);
-    } catch {
-      console.log(`  ⊘ Skipping ${decision.name}: File not found (${decision.file})`);
-      results.skipped.push({ key, reason: 'File not found' });
-      continue;
+    for (const decision of dmnFiles) {
+      const result = await deployProcess(decision, decision.path);
+      if (result) {
+        results.deployed.push({ key: decision.name, ...result });
+      } else {
+        results.failed.push({ key: decision.name, name: decision.name });
+      }
     }
+  }
 
-    const result = await deployProcess(decision, filePath);
-    if (result) {
-      results.deployed.push({ key, ...result });
-    } else {
-      results.failed.push({ key, name: decision.name });
+  // Discover CMMN files
+  const cmmnFiles = await discoverFiles(config.processesDir, 'cmmn');
+  if (cmmnFiles.length > 0) {
+    console.log('');
+    console.log('─'.repeat(50));
+    console.log('  Deploying CMMN Cases');
+    console.log('─'.repeat(50));
+
+    for (const caseFile of cmmnFiles) {
+      const result = await deployProcess(caseFile, caseFile.path);
+      if (result) {
+        results.deployed.push({ key: caseFile.name, ...result });
+      } else {
+        results.failed.push({ key: caseFile.name, name: caseFile.name });
+      }
     }
+  }
+
+  // Check if any files were found
+  const totalFiles = bpmnFiles.length + dmnFiles.length + cmmnFiles.length;
+  if (totalFiles === 0) {
+    console.log('');
+    console.log('⚠ No process files found');
+    console.log('');
+    console.log('Expected directory structure:');
+    console.log(`  ${config.processesDir}/`);
+    console.log('    ├── bpmn/');
+    console.log('    │   └── *.bpmn');
+    console.log('    ├── dmn/');
+    console.log('    │   └── *.dmn');
+    console.log('    └── cmmn/');
+    console.log('        └── *.cmmn');
   }
 
   return results;
-}
-
-/**
- * Create sample process files if they don't exist
- */
-async function createSampleProcesses() {
-  const processesDir = path.join(__dirname, '../processes');
-
-  // Create directories
-  await fs.mkdir(path.join(processesDir, 'bpmn'), { recursive: true });
-  await fs.mkdir(path.join(processesDir, 'dmn'), { recursive: true });
-  await fs.mkdir(path.join(processesDir, 'cmmn'), { recursive: true });
-
-  // Sample Invoice Process BPMN
-  const invoiceBpmn = `<?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
-                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
-                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
-                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
-                  id="Definitions_1"
-                  targetNamespace="http://bpmn.io/schema/bpmn">
-  <bpmn:process id="invoice" name="Invoice Receipt" isExecutable="true">
-    <bpmn:startEvent id="StartEvent_1" name="Invoice received">
-      <bpmn:outgoing>Flow_1</bpmn:outgoing>
-    </bpmn:startEvent>
-    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_AssignApprover" />
-    <bpmn:businessRuleTask id="Task_AssignApprover" name="Assign Approver" camunda:decisionRef="invoice-assign-approver">
-      <bpmn:incoming>Flow_1</bpmn:incoming>
-      <bpmn:outgoing>Flow_2</bpmn:outgoing>
-    </bpmn:businessRuleTask>
-    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_AssignApprover" targetRef="Task_ApproveInvoice" />
-    <bpmn:userTask id="Task_ApproveInvoice" name="Approve Invoice" camunda:assignee="\${approver}">
-      <bpmn:incoming>Flow_2</bpmn:incoming>
-      <bpmn:outgoing>Flow_3</bpmn:outgoing>
-    </bpmn:userTask>
-    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_ApproveInvoice" targetRef="Gateway_1" />
-    <bpmn:exclusiveGateway id="Gateway_1" name="Invoice approved?">
-      <bpmn:incoming>Flow_3</bpmn:incoming>
-      <bpmn:outgoing>Flow_4</bpmn:outgoing>
-      <bpmn:outgoing>Flow_5</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_4" name="yes" sourceRef="Gateway_1" targetRef="Task_PrepareBankTransfer">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\${approved}</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_5" name="no" sourceRef="Gateway_1" targetRef="Task_ReviewInvoice">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\${!approved}</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:userTask id="Task_PrepareBankTransfer" name="Prepare Bank Transfer" camunda:candidateGroups="accounting">
-      <bpmn:incoming>Flow_4</bpmn:incoming>
-      <bpmn:outgoing>Flow_6</bpmn:outgoing>
-    </bpmn:userTask>
-    <bpmn:userTask id="Task_ReviewInvoice" name="Review Invoice" camunda:assignee="demo">
-      <bpmn:incoming>Flow_5</bpmn:incoming>
-      <bpmn:outgoing>Flow_7</bpmn:outgoing>
-    </bpmn:userTask>
-    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_PrepareBankTransfer" targetRef="EndEvent_1" />
-    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_ReviewInvoice" targetRef="EndEvent_2" />
-    <bpmn:endEvent id="EndEvent_1" name="Invoice paid">
-      <bpmn:incoming>Flow_6</bpmn:incoming>
-    </bpmn:endEvent>
-    <bpmn:endEvent id="EndEvent_2" name="Invoice rejected">
-      <bpmn:incoming>Flow_7</bpmn:incoming>
-    </bpmn:endEvent>
-  </bpmn:process>
-</bpmn:definitions>`;
-
-  // Sample DMN Decision
-  const invoiceDmn = `<?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
-             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
-             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
-             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
-             id="Definitions_1"
-             name="Invoice Assignment"
-             namespace="http://camunda.org/schema/1.0/dmn">
-  <decision id="invoice-assign-approver" name="Assign Approver">
-    <decisionTable id="DecisionTable_1" hitPolicy="FIRST">
-      <input id="Input_1" label="Amount">
-        <inputExpression id="InputExpression_1" typeRef="double">
-          <text>amount</text>
-        </inputExpression>
-      </input>
-      <input id="Input_2" label="Category">
-        <inputExpression id="InputExpression_2" typeRef="string">
-          <text>invoiceCategory</text>
-        </inputExpression>
-      </input>
-      <output id="Output_1" label="Approver" name="approver" typeRef="string" />
-      <rule id="Rule_1">
-        <inputEntry id="InputEntry_1"><text>&lt; 250</text></inputEntry>
-        <inputEntry id="InputEntry_2"><text></text></inputEntry>
-        <outputEntry id="OutputEntry_1"><text>"demo"</text></outputEntry>
-      </rule>
-      <rule id="Rule_2">
-        <inputEntry id="InputEntry_3"><text>&gt;= 250</text></inputEntry>
-        <inputEntry id="InputEntry_4"><text>"Travel Expenses"</text></inputEntry>
-        <outputEntry id="OutputEntry_2"><text>"john"</text></outputEntry>
-      </rule>
-      <rule id="Rule_3">
-        <inputEntry id="InputEntry_5"><text>&gt;= 250</text></inputEntry>
-        <inputEntry id="InputEntry_6"><text></text></inputEntry>
-        <outputEntry id="OutputEntry_3"><text>"mary"</text></outputEntry>
-      </rule>
-    </decisionTable>
-  </decision>
-</definitions>`;
-
-  // Write sample files
-  const invoiceBpmnPath = path.join(processesDir, 'bpmn/invoice.bpmn');
-  const invoiceDmnPath = path.join(processesDir, 'dmn/invoice-assign-approver.dmn');
-
-  try {
-    await fs.access(invoiceBpmnPath);
-    console.log('Sample invoice.bpmn already exists');
-  } catch {
-    await fs.writeFile(invoiceBpmnPath, invoiceBpmn);
-    console.log('✓ Created sample invoice.bpmn');
-  }
-
-  try {
-    await fs.access(invoiceDmnPath);
-    console.log('Sample invoice-assign-approver.dmn already exists');
-  } catch {
-    await fs.writeFile(invoiceDmnPath, invoiceDmn);
-    console.log('✓ Created sample invoice-assign-approver.dmn');
-  }
 }
 
 /**
@@ -308,28 +322,61 @@ async function createSampleProcesses() {
  */
 async function main() {
   console.log('═'.repeat(60));
-  console.log('  Operaton Process Deployment Script');
+  console.log('  Operaton Process Deployment');
   console.log('═'.repeat(60));
-  console.log(`\nTarget: ${config.baseUrl}\n`);
+  console.log('');
+
+  if (process.env.DEBUG === 'true') {
+    console.log('Configuration:');
+    console.log(`  REST URL: ${config.baseUrl}`);
+    console.log(`  Web URL: ${config.webUrl}`);
+    console.log(`  Username: ${config.username}`);
+    console.log(`  Password: ${'*'.repeat(config.password.length)}`);
+    console.log(`  Processes dir: ${config.processesDir}`);
+    console.log('');
+  }
+
+  console.log(`Target: ${config.baseUrl}`);
+  console.log('');
 
   // Check connection
-  if (!(await checkConnection())) {
-    console.error('\nCannot proceed without connection to Operaton');
+  const connection = await checkConnection();
+  if (!connection.connected) {
+    console.log(`✗ Cannot connect to Operaton: ${connection.error}`);
+    console.log('');
+    console.log('Troubleshooting:');
+    console.log('  1. Run "make check" for detailed connection diagnostics');
+    console.log('  2. Verify Operaton is running');
+    console.log('  3. Check .env file configuration');
     process.exit(1);
   }
 
-  // Create sample processes if needed
-  console.log('\n📁 Checking sample processes...');
-  await createSampleProcesses();
+  console.log(`✓ Connected to engine: ${connection.engine}`);
 
-  // Get existing deployments
-  console.log('\n📋 Existing deployments:');
+  // Check processes directory
+  if (!(await checkProcessesDir())) {
+    console.log(`✗ Processes directory not found: ${config.processesDir}`);
+    console.log('');
+    console.log('Troubleshooting:');
+    console.log('  1. Create the processes/ directory');
+    console.log('  2. Add BPMN/DMN/CMMN files to deploy');
+    console.log('  3. Or set PROCESSES_DIR environment variable');
+    process.exit(1);
+  }
+
+  // Show existing deployments
+  console.log('');
+  console.log('─'.repeat(50));
+  console.log('  Existing Deployments');
+  console.log('─'.repeat(50));
+
   const existingDeployments = await getExistingDeployments();
   if (existingDeployments.length === 0) {
     console.log('  (none)');
   } else {
     existingDeployments.slice(0, 5).forEach(d => {
-      console.log(`  - ${d.name} (${d.id})`);
+      const name = d.name || '(unnamed)';
+      console.log(`  - ${name} (${d.id.substring(0, 8)}...)`);
     });
     if (existingDeployments.length > 5) {
       console.log(`  ... and ${existingDeployments.length - 5} more`);
@@ -340,29 +387,30 @@ async function main() {
   const results = await deployAllProcesses();
 
   // Summary
-  console.log(`\n${'═'.repeat(60)}`);
+  console.log('');
+  console.log('═'.repeat(60));
   console.log('  Deployment Summary');
   console.log('═'.repeat(60));
   console.log(`  Deployed: ${results.deployed.length}`);
   console.log(`  Failed:   ${results.failed.length}`);
-  console.log(`  Skipped:  ${results.skipped.length}`);
-  console.log(`${'═'.repeat(60)}\n`);
+  console.log('═'.repeat(60));
 
   if (results.failed.length > 0) {
+    console.log('');
     console.log('Failed deployments:');
     results.failed.forEach(f => console.log(`  - ${f.name}`));
   }
 
-  if (results.skipped.length > 0) {
-    console.log('\nSkipped (files not found):');
-    results.skipped.forEach(s => console.log(`  - ${s.key}: ${s.reason}`));
-    console.log('\nTo create missing process files:');
-    console.log('  1. Copy BPMN/DMN files to processes/ directory');
-    console.log('  2. Or use existing files from Camunda examples');
+  // Exit with error if any deployments failed
+  if (results.failed.length > 0) {
+    process.exit(1);
   }
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err);
+  console.error('Unexpected error:', err.message);
+  if (process.env.DEBUG === 'true') {
+    console.error(err.stack);
+  }
   process.exit(1);
 });
