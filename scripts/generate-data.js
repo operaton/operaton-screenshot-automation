@@ -50,8 +50,8 @@ function getErrorMessage(error) {
     const { status = 0 } = error.response;
     const message = error.response.data?.message;
     if (message) {
-      // Truncate long messages
-      const truncated = message.length > 100 ? `${message.substring(0, 100)}...` : message;
+      // Show more of the message for debugging
+      const truncated = message.length > 200 ? `${message.substring(0, 200)}...` : message;
       return `${truncated} (HTTP ${status})`;
     }
     switch (status) {
@@ -246,12 +246,17 @@ async function createGroup(groupData) {
  */
 async function addUserToGroup(userId, groupId) {
   try {
+    // Check if already a member
+    const members = await api.get(`/group/${groupId}/members`).catch(() => ({ data: [] }));
+    if (members.data.some(m => m.id === userId)) {
+      debug(`${userId} is already a member of ${groupId}`);
+      return;
+    }
+
     await api.put(`/group/${groupId}/members/${userId}`);
     console.log(`  ✓ Added ${userId} to group ${groupId}`);
   } catch (error) {
-    if (!error.response?.data?.message?.includes('already member')) {
-      debug(`Could not add ${userId} to ${groupId}: ${getErrorMessage(error)}`);
-    }
+    debug(`Could not add ${userId} to ${groupId}: ${getErrorMessage(error)}`);
   }
 }
 
@@ -481,6 +486,7 @@ async function createTestScenarios() {
   console.log('─'.repeat(50));
 
   const categories = ['Travel Expenses', 'Misc', 'Software License'];
+  const approvers = ['john', 'mary', 'peter', 'demo', 'john'];
   for (let i = 0; i < 5; i++) {
     await startProcessInstance(
       invoiceProcess.key,
@@ -489,6 +495,7 @@ async function createTestScenarios() {
         creditor: `Vendor ${i + 1}`,
         invoiceNumber: `INV-${Date.now()}-${i}`,
         invoiceCategory: categories[i % 3],
+        approver: approvers[i],
       },
       `BK-${Date.now()}-${i}`
     );
@@ -507,6 +514,7 @@ async function createTestScenarios() {
       creditor: `Completed Vendor ${i + 1}`,
       invoiceNumber: `INV-COMP-${Date.now()}-${i}`,
       invoiceCategory: 'Misc',
+      approver: 'demo',
     });
 
     if (instance) {
