@@ -34,9 +34,9 @@ const deploymentsOnly = args.includes('--deployments-only');
 const usersOnly = args.includes('--users-only');
 const historyOnly = args.includes('--history-only');
 
-// Users created by our scripts (don't delete demo or admin users)
-const CREATED_USERS = ['john', 'mary', 'peter'];
-const CREATED_GROUPS = ['accounting', 'management', 'sales'];
+// Protected users and groups (never delete these)
+const PROTECTED_USERS = ['demo', 'admin'];
+const PROTECTED_GROUPS = ['operaton-admin'];
 
 /**
  * Log debug information if DEBUG mode is enabled
@@ -359,53 +359,87 @@ async function deleteHistoricBatches() {
 }
 
 /**
- * Delete created users
+ * Delete all users except protected ones
  * @returns {Promise<number>} - Number of deleted users
  */
 async function deleteUsers() {
   console.log('');
-  console.log('Deleting created users...');
+  console.log('Deleting users...');
 
-  let deleted = 0;
-  for (const userId of CREATED_USERS) {
-    try {
-      await api.delete(`/user/${userId}`);
-      console.log(`    Deleted user: ${userId}`);
-      deleted++;
-    } catch (error) {
-      if (error.response?.status !== 404) {
-        debug(`Could not delete user ${userId}: ${getErrorMessage(error)}`);
+  try {
+    // Fetch all users
+    const response = await api.get('/user');
+    const users = response.data;
+
+    // Filter out protected users
+    const usersToDelete = users.filter(u => !PROTECTED_USERS.includes(u.id));
+
+    if (usersToDelete.length === 0) {
+      console.log('  No users to delete (only protected users exist)');
+      return 0;
+    }
+
+    console.log(`  Found ${usersToDelete.length} user(s) to delete`);
+
+    let deleted = 0;
+    for (const user of usersToDelete) {
+      try {
+        await api.delete(`/user/${user.id}`);
+        console.log(`    Deleted user: ${user.id}`);
+        deleted++;
+      } catch (error) {
+        debug(`Could not delete user ${user.id}: ${getErrorMessage(error)}`);
       }
     }
-  }
 
-  console.log(`  ✓ Deleted ${deleted} user(s)`);
-  return deleted;
+    console.log(`  ✓ Deleted ${deleted} user(s)`);
+    return deleted;
+  } catch (error) {
+    console.log(`  ✗ Error fetching users: ${getErrorMessage(error)}`);
+    return 0;
+  }
 }
 
 /**
- * Delete created groups
+ * Delete all groups except protected ones
  * @returns {Promise<number>} - Number of deleted groups
  */
 async function deleteGroups() {
   console.log('');
-  console.log('Deleting created groups...');
+  console.log('Deleting groups...');
 
-  let deleted = 0;
-  for (const groupId of CREATED_GROUPS) {
-    try {
-      await api.delete(`/group/${groupId}`);
-      console.log(`    Deleted group: ${groupId}`);
-      deleted++;
-    } catch (error) {
-      if (error.response?.status !== 404) {
-        debug(`Could not delete group ${groupId}: ${getErrorMessage(error)}`);
+  try {
+    // Fetch all groups
+    const response = await api.get('/group');
+    const groups = response.data;
+
+    // Filter out protected groups
+    const groupsToDelete = groups.filter(g => !PROTECTED_GROUPS.includes(g.id));
+
+    if (groupsToDelete.length === 0) {
+      console.log('  No groups to delete (only protected groups exist)');
+      return 0;
+    }
+
+    console.log(`  Found ${groupsToDelete.length} group(s) to delete`);
+
+    let deleted = 0;
+    for (const group of groupsToDelete) {
+      try {
+        await api.delete(`/group/${group.id}`);
+        console.log(`    Deleted group: ${group.id}`);
+        deleted++;
+      } catch (error) {
+        debug(`Could not delete group ${group.id}: ${getErrorMessage(error)}`);
       }
     }
-  }
 
-  console.log(`  ✓ Deleted ${deleted} group(s)`);
-  return deleted;
+    console.log(`  ✓ Deleted ${deleted} group(s)`);
+    return deleted;
+  } catch (error) {
+    console.log(`  ✗ Error fetching groups: ${getErrorMessage(error)}`);
+    return 0;
+  }
 }
 
 /**

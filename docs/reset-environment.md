@@ -73,7 +73,7 @@ When running without flags, the script deletes everything in this order:
 The following are NOT deleted:
 
 - **demo** user - Default admin user
-- **camunda-admin** group - Default admin group
+- **operaton-admin** group - Default admin group
 - System configurations
 
 ## Exit Codes
@@ -303,7 +303,7 @@ The script handles various error scenarios:
 
 1. **Confirmation prompt** - Requires explicit `y` to proceed (unless `--force`)
 2. **Protected users** - Never deletes `demo` user
-3. **Protected groups** - Never deletes `camunda-admin` group
+3. **Protected groups** - Never deletes `operaton-admin` group
 4. **Cascade delete** - Deployments deleted with cascade to clean up properly
 
 ## Related Commands
