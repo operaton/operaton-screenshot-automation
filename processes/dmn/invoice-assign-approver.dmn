@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
-             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
-             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
-             xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/"
-             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
-             id="Definitions_InvoiceAssignment"
-             name="Invoice Assignment"
-             namespace="http://operaton.org/examples/invoice"
-             exporter="Camunda Modeler"
-             exporterVersion="5.0.0">
-  
-  <decision id="invoice-assign-approver" name="Assign Approver">
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:camunda="http://camunda.org/schema/1.0/dmn" id="Definitions_InvoiceAssignment" name="Invoice Assignment" namespace="http://operaton.org/examples/invoice" exporter="Camunda Modeler" exporterVersion="5.36.0">
+  <decision id="invoice-assign-approver" name="Assign Approver" camunda:historyTimeToLive="0">
     <decisionTable id="DecisionTable_AssignApprover" hitPolicy="FIRST">
       <input id="Input_Amount" label="Amount">
         <inputExpression id="InputExpression_Amount" typeRef="double">
@@ -23,8 +13,6 @@
         </inputExpression>
       </input>
       <output id="Output_Approver" label="Approver" name="approver" typeRef="string" />
-      
-      <!-- Rule 1: Small amounts get auto-approved by demo -->
       <rule id="Rule_SmallAmount">
         <description>Small invoices: approved by demo</description>
         <inputEntry id="InputEntry_Small">
@@ -37,8 +25,6 @@
           <text>"demo"</text>
         </outputEntry>
       </rule>
-      
-      <!-- Rule 2: Medium travel expenses go to john -->
       <rule id="Rule_MediumTravel">
         <description>Medium travel expenses: approved by john</description>
         <inputEntry id="InputEntry_Medium1">
@@ -51,8 +37,6 @@
           <text>"john"</text>
         </outputEntry>
       </rule>
-      
-      <!-- Rule 3: Medium software licenses go to mary -->
       <rule id="Rule_MediumSoftware">
         <description>Medium software licenses: approved by mary</description>
         <inputEntry id="InputEntry_Medium2">
@@ -65,8 +49,6 @@
           <text>"mary"</text>
         </outputEntry>
       </rule>
-      
-      <!-- Rule 4: Medium misc goes to demo -->
       <rule id="Rule_MediumMisc">
         <description>Medium misc expenses: approved by demo</description>
         <inputEntry id="InputEntry_Medium3">
@@ -79,8 +61,6 @@
           <text>"demo"</text>
         </outputEntry>
       </rule>
-      
-      <!-- Rule 5: Large amounts need management approval (peter) -->
       <rule id="Rule_LargeAmount">
         <description>Large invoices: approved by peter (management)</description>
         <inputEntry id="InputEntry_Large">
@@ -93,8 +73,6 @@
           <text>"peter"</text>
         </outputEntry>
       </rule>
-      
-      <!-- Default rule -->
       <rule id="Rule_Default">
         <description>Default: approved by demo</description>
         <inputEntry id="InputEntry_Default1">
@@ -109,7 +87,6 @@
       </rule>
     </decisionTable>
   </decision>
-  
   <dmndi:DMNDI>
     <dmndi:DMNDiagram id="DMNDiagram_1">
       <dmndi:DMNShape id="DMNShape_Decision" dmnElementRef="invoice-assign-approver">

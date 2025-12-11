@@ -7,7 +7,8 @@
 
 .PHONY: help install setup deploy data incidents simulate capture analyze reset clean all \
         check check-debug test test-check chaos-check chaos-check-debug status-debug \
-		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug
+		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug \
+		deploy-debug chaos-deploy chaos-deploy-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -117,9 +118,13 @@ status-debug: ## Show current status of Operaton with debug output (MERGED)
 # DEPLOYMENT & DATA GENERATION
 #---------------------------------------------------------------------------
 
-deploy: ## Deploy BPMN/DMN processes to Operaton
+deploy: ## Deploy BPMN/DMN processes to Operaton (MERGED)
 	@printf "$(CYAN)Deploying processes...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/deploy-processes.js
+
+deploy-debug: ## Deploy BPMN/DMN processes to Operaton with debug output (MERGED)
+	@printf "$(CYAN)Deploying processes (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/deploy-processes.js
 
 users: ## Create users and groups only
 	@printf "$(CYAN)Creating users and groups...$(RESET)\n"
@@ -251,10 +256,12 @@ test: ## Run all tests
 	$(NODE) tests/chaos-analyze-documentation.js
 	$(NODE) tests/chaos-check-connection.js
 	$(NODE) tests/chaos-show-status.js
+	$(NODE) tests/chaos-deploy-processes.js
 	@printf "$(GREEN)All tests passed$(RESET)\n"
 
 test-analyze: chaos-analyze ## Alias for chaos-analyze
 test-check: chaos-check ## Alias for chaos-check
+test-deploy: chaos-deploy ## Alias for chaos-deploy
 test-status: chaos-status ## Alias for chaos-status
 
 chaos-analyze: ## Run chaos tests for analyze-documentation (MERGED)
@@ -272,6 +279,14 @@ chaos-check: ## Run chaos tests for checking Operaton instance (MERGED)
 chaos-check-debug: ## Run chaos tests for checking Operaton instance with debug output (MERGED)
 	@printf "$(CYAN)Running chaos tests for checking Operaton connection (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-check-connection.js
+
+chaos-deploy: ## Run chaos tests for Deploy BPMN/DMN processes to Operaton (MERGED)
+	@printf "$(CYAN)Running chaos tests for deploy-processes...$(RESET)\n"
+	$(NODE) tests/chaos-deploy-processes.js
+
+chaos-deploy-debug: ## Run chaos tests for Deploy BPMN/DMN processes to Operaton with debug output (MERGED)
+	@printf "$(CYAN)Running chaos tests for deploy-processes (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-deploy-processes.js
 
 chaos-status: ## Run chaos tests for showing current status of Operaton (MERGED)
 	@printf "$(CYAN)Running chaos tests for showing Operaton status...$(RESET)\n"
