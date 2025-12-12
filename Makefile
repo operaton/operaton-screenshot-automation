@@ -12,7 +12,9 @@
 		chaos-simulate chaos-simulate-debug status-debug analyze-debug deploy-debug  reset-debug \
 		reset-history data-debug incidents incidents-debug incidents-script incidents-service \
 		incidents-expression incidents-job simulate simulate-debug simulate-tokens simulate-history \
-		simulate-tasks capture-debug capture-visible chaos-capture chaos-capture-debug
+		simulate-tasks capture-debug capture-visible chaos-capture chaos-capture-debug \
+		scan-docs scan-docs-path replace-screenshots replace-screenshots-live replace-screenshots-verbose \
+		screenshots-workflow
 
 # Default target
 .DEFAULT_GOAL := help
@@ -254,6 +256,52 @@ clean: ## Clean local output files (screenshots, reports)
 	@printf "$(GREEN)✓ Output directory cleaned$(RESET)\n"
 
 wipe: reset clean ## Full wipe: reset Operaton AND clean local files
+
+#---------------------------------------------------------------------------
+# DOCUMENTATION SCANNING & REPLACEMENT
+# These commands use values from .env file by default
+# Override with: make scan-docs DOCS_PATH=/custom/path
+#---------------------------------------------------------------------------
+
+scan-docs: ## Scan documentation for image references and generate screenshot configs
+	@printf "$(CYAN)Scanning documentation for screenshots...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/scan-docs.js
+
+replace-screenshots: ## Preview screenshot replacements (dry run)
+	@printf "$(CYAN)Previewing screenshot replacements (dry run)...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/replace-screenshots.js
+
+replace-screenshots-live: ## Actually replace screenshots in documentation
+	@printf "$(YELLOW)Replacing screenshots (LIVE - files will be modified)...$(RESET)\n"
+	@printf "$(YELLOW)Press Ctrl+C within 3 seconds to cancel...$(RESET)\n"
+	@sleep 3
+	DRY_RUN=false $(NODE) $(SCRIPTS_DIR)/replace-screenshots.js
+
+replace-screenshots-verbose: ## Preview replacements with verbose output
+	@printf "$(CYAN)Previewing screenshot replacements (verbose)...$(RESET)\n"
+	VERBOSE=true $(NODE) $(SCRIPTS_DIR)/replace-screenshots.js
+
+#---------------------------------------------------------------------------
+# WORKFLOW SHORTCUTS
+#---------------------------------------------------------------------------
+
+screenshots-workflow: ## Show full screenshot workflow instructions
+	@printf "$(CYAN)Screenshot Workflow$(RESET)\n"
+	@printf "$(CYAN)==================$(RESET)\n\n"
+	@printf "1. Configure .env with DOCS_PATH and STATIC_PATH\n"
+	@printf "   (copy .env.example to .env and edit)\n\n"
+	@printf "2. Scan documentation:\n"
+	@printf "   make scan-docs\n\n"
+	@printf "3. Select a generated config:\n"
+	@printf "   cp config/generated/screenshots-cockpit.json config/screenshots.json\n"
+	@printf "   # Or: cp config/generated/screenshots-all.json config/screenshots.json\n\n"
+	@printf "4. Capture screenshots:\n"
+	@printf "   make capture\n\n"
+	@printf "5. Preview replacements:\n"
+	@printf "   make replace-screenshots\n\n"
+	@printf "6. Apply replacements:\n"
+	@printf "   make replace-screenshots-live\n\n"
+	@printf "7. Commit changes in documentation repo\n"
 
 #---------------------------------------------------------------------------
 # WORKFLOWS (Combined Tasks)
