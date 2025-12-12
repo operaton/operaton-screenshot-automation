@@ -1,0 +1,265 @@
+{
+  "version": "1.0.0",
+  "description": "Tasklist webapp screenshots - generated from documentation",
+  "generatedAt": "2025-12-12T21:08:03.674Z",
+  "categories": {
+    "tasklist": {
+      "description": "Tasklist webapp screenshots",
+      "baseUrl": "/operaton/app/tasklist/default"
+    }
+  },
+  "screenshots": [
+    {
+      "id": "tasklist-generic-form",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/user-guide/task-forms/tasklist-generic-form.png",
+      "sourceDoc": "documentation\\user-guide\\task-forms\\index.md",
+      "sourceLine": 235,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-forms-layouted-start",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/user-guide/task-forms/tasklist-forms-layouted-start.png",
+      "sourceDoc": "documentation\\user-guide\\task-forms\\jsf-task-forms.md",
+      "sourceLine": 237,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-dashboard-detail",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-dashboard-detail.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 13,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-toggle-view",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-toggle-view.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 20,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-start-process",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-start-process.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 27,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-start-task",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-start-task.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 36,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-filter-results",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-filter-results.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 45,
+      "needsReview": false
+    },
+    {
+      "id": "tasklist-task-search",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-task-search.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 56,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-case-insensitive",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-case-insensitive.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 67,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-in-operator",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-in-operator.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 75,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-in-operator-modal",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-in-operator-modal.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 88,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-task-view",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-task-view.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 92,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-task-view-tabs",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-task-view-tabs.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\dashboard.md",
+      "sourceLine": 114,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-create-filter",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-create-filter.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\filters.md",
+      "sourceLine": 14,
+      "needsReview": false
+    },
+    {
+      "id": "tasklist-filter-detail",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-filter-detail.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\filters.md",
+      "sourceLine": 36,
+      "needsReview": false
+    },
+    {
+      "id": "tasklist-user-task-state-complete",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-user-task-state-complete.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\task-lifecycle.md",
+      "sourceLine": 16,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-plugin-navbar-action",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-plugin-navbar-action.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\tasklist-plugins.md",
+      "sourceLine": 33,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-plugin-task-action",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-plugin-task-action.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\tasklist-plugins.md",
+      "sourceLine": 39,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-plugin-tasklist-header",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-plugin-tasklist-header.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\tasklist-plugins.md",
+      "sourceLine": 45,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-plugin-task-detail",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-plugin-task-detail.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\tasklist-plugins.md",
+      "sourceLine": 51,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-plugin-list",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-plugin-list.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\tasklist-plugins.md",
+      "sourceLine": 69,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-plugin-card",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-plugin-card.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\tasklist-plugins.md",
+      "sourceLine": 75,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-task-form-modeler",
+      "category": "tasklist",
+      "description": "Example img",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/documentation/webapps/tasklist/tasklist-task-form-modeler.png",
+      "sourceDoc": "documentation\\webapps\\tasklist\\user-assignment.md",
+      "sourceLine": 23,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-dmn1",
+      "category": "tasklist",
+      "description": "Example image",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/get-started/quick-start/tasklist-dmn1.png",
+      "sourceDoc": "get-started\\quick-start\\decision-automation.md",
+      "sourceLine": 64,
+      "needsReview": true
+    },
+    {
+      "id": "tasklist-dmn2",
+      "category": "tasklist",
+      "description": "Example image",
+      "path": "#/?task={taskId}",
+      "outputFile": "img/get-started/quick-start/tasklist-dmn2.png",
+      "sourceDoc": "get-started\\quick-start\\decision-automation.md",
+      "sourceLine": 70,
+      "needsReview": true
+    }
+  ],
+  "users": [],
+  "groups": []
+}

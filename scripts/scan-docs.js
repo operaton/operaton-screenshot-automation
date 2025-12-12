@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  * Copyright 2025 Operaton
  *
- * Scan Documentation for Screenshot References
+ * Scan Documentation for Screenshot References (v2)
  *
- * Scans markdown files in Operaton documentation to:
- * 1. Find all image references
- * 2. Identify webapp screenshots (cockpit, tasklist, admin, welcome)
- * 3. Group by category
- * 4. Generate screenshot configuration files
+ * Improved version that:
+ * 1. Focuses on actual webapp screenshots (from webapps docs)
+ * 2. Better categorization based on file path, not keywords
+ * 3. Smarter URL inference from image filenames
+ * 4. Separates webapp screenshots from other images
  */
 
 import 'dotenv/config';
@@ -20,42 +20,11 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Configuration - uses .env values with sensible defaults
+// Configuration
 const config = {
-  // Path to documentation
   docsPath: process.env.DOCS_PATH || path.join(__dirname, '..', '..', 'documentation', 'docs'),
-  // Output directory for generated configs
   outputDir: process.env.GENERATED_CONFIG_DIR || path.join(__dirname, '..', 'config', 'generated'),
-  // Debug mode
   debug: process.env.DEBUG === 'true',
-  // Webapp screenshot patterns
-  webappPatterns: {
-    cockpit: [
-      /cockpit/i,
-      /process-definition/i,
-      /process-instance/i,
-      /decision/i,
-      /batch/i,
-      /migration/i,
-      /dashboard/i,
-      /deployment/i,
-      /incident/i,
-      /job/i,
-      /heatmap/i,
-    ],
-    tasklist: [/tasklist/i, /task-/i, /filter/i, /form/i],
-    admin: [
-      /admin/i,
-      /user/i,
-      /group/i,
-      /tenant/i,
-      /authorization/i,
-      /system/i,
-      /execution-metrics/i,
-    ],
-    welcome: [/welcome/i, /profile/i],
-  },
-  // Image extensions to look for
   imageExtensions: ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'],
 };
 
@@ -63,15 +32,154 @@ const config = {
 const results = {
   totalFiles: 0,
   totalImages: 0,
-  byCategory: {
+  webappScreenshots: {
     cockpit: [],
     tasklist: [],
     admin: [],
     welcome: [],
-    other: [],
   },
+  otherImages: [],
   byDocSection: {},
 };
+
+/**
+ * Determine webapp category from image path
+ * Only categorizes images that are actual webapp screenshots
+ */
+function getWebappCategory(imagePath, sourceFile) {
+  const imgLower = imagePath.toLowerCase();
+  const srcLower = sourceFile.toLowerCase();
+
+  // Method 1: Check if image is in webapps documentation section
+  if (srcLower.includes('webapps/cockpit') || imgLower.includes('webapps/cockpit')) {
+    return 'cockpit';
+  }
+  if (srcLower.includes('webapps/tasklist') || imgLower.includes('webapps/tasklist')) {
+    return 'tasklist';
+  }
+  if (srcLower.includes('webapps/admin') || imgLower.includes('webapps/admin')) {
+    return 'admin';
+  }
+  if (srcLower.includes('webapps/welcome') || imgLower.includes('webapps/welcome')) {
+    return 'welcome';
+  }
+
+  // Method 2: Check image filename prefixes (common naming convention)
+  const basename = path.basename(imgLower);
+  if (basename.startsWith('cockpit-') || basename.startsWith('cockpit_')) {
+    return 'cockpit';
+  }
+  if (basename.startsWith('tasklist-') || basename.startsWith('tasklist_')) {
+    return 'tasklist';
+  }
+  if (basename.startsWith('admin-') || basename.startsWith('admin_')) {
+    return 'admin';
+  }
+  if (basename.startsWith('welcome-') || basename.startsWith('welcome_')) {
+    return 'welcome';
+  }
+
+  // Not a webapp screenshot
+  return null;
+}
+
+/**
+ * Infer URL path from image filename for cockpit
+ */
+function inferCockpitUrl(imagePath) {
+  const img = imagePath.toLowerCase();
+
+  // Dashboard
+  if (img.includes('dashboard')) return '#/dashboard';
+
+  // Process views
+  if (img.includes('process-definition') || img.includes('process_definition')) {
+    return '#/process-definition/{processDefinitionKey}';
+  }
+  if (img.includes('process-instance') || img.includes('process_instance')) {
+    return '#/process-instance/{processInstanceId}';
+  }
+  if (img.includes('processes')) return '#/processes';
+
+  // Decision views
+  if (img.includes('decision-definition') || img.includes('decision_definition')) {
+    return '#/decision-definition/{decisionDefinitionKey}';
+  }
+  if (img.includes('decision-instance') || img.includes('decision_instance')) {
+    return '#/decision-instance/{decisionInstanceId}';
+  }
+  if (img.includes('decision')) return '#/decisions';
+
+  // Case views
+  if (img.includes('case-definition') || img.includes('case_definition')) {
+    return '#/case-definition/{caseDefinitionKey}';
+  }
+  if (img.includes('case-instance') || img.includes('case_instance')) {
+    return '#/case-instance/{caseInstanceId}';
+  }
+  if (img.includes('case')) return '#/cases';
+
+  // Other views
+  if (img.includes('deployment') || img.includes('repository')) return '#/repository';
+  if (img.includes('batch')) return '#/batch';
+  if (img.includes('migration')) return '#/migration';
+  if (img.includes('incident')) return '#/dashboard';
+  if (img.includes('job')) return '#/dashboard';
+  if (img.includes('history')) return '#/process-definition/{processDefinitionKey}/history';
+  if (img.includes('heatmap')) return '#/process-definition/{processDefinitionKey}/history';
+  if (img.includes('cleanup')) return '#/cleanup';
+  if (img.includes('report')) return '#/reports';
+
+  return '#/dashboard';
+}
+
+/**
+ * Infer URL path from image filename for tasklist
+ */
+function inferTasklistUrl(imagePath) {
+  const img = imagePath.toLowerCase();
+
+  if (img.includes('filter')) return '#/';
+  if (img.includes('form')) return '#/?task={taskId}';
+  if (img.includes('task')) return '#/?task={taskId}';
+
+  return '#/';
+}
+
+/**
+ * Infer URL path from image filename for admin
+ */
+function inferAdminUrl(imagePath) {
+  const img = imagePath.toLowerCase();
+
+  if (img.includes('user')) return '#/users';
+  if (img.includes('group')) return '#/groups';
+  if (img.includes('tenant')) return '#/tenants';
+  if (img.includes('authorization') || img.includes('auth')) return '#/authorization?resource=0';
+  if (img.includes('system')) return '#/system';
+  if (img.includes('metric')) return '#/system?section=execution-metrics';
+  if (img.includes('diagnostic')) return '#/system?section=diagnostics';
+
+  return '#/users';
+}
+
+/**
+ * Infer URL path based on category
+ */
+function inferUrlPath(category, imagePath) {
+  switch (category) {
+    case 'cockpit':
+      return inferCockpitUrl(imagePath);
+    case 'tasklist':
+      return inferTasklistUrl(imagePath);
+    case 'admin':
+      return inferAdminUrl(imagePath);
+    case 'welcome':
+      return '#/welcome';
+    default:
+      return '#/';
+  }
+}
 
 /**
  * Extract image references from markdown content
@@ -86,7 +194,7 @@ function extractImageReferences(content, filePath) {
 
   while ((match = mdImageRegex.exec(content)) !== null) {
     const alt = match[1];
-    const imagePath = match[2].split(' ')[0]; // Remove title if present
+    const imagePath = match[2].split(' ')[0].split('#')[0]; // Remove title and anchors
     const lineNumber = content.substring(0, match.index).split('\n').length;
 
     // Skip external URLs
@@ -105,15 +213,14 @@ function extractImageReferences(content, filePath) {
       path: imagePath,
       sourceFile: relativeFilePath,
       lineNumber,
-      fullMatch: match[0],
     });
   }
 
   // Match HTML img tags
-  const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*(?:alt=["']([^"']+)["'])?[^>]*>/gi;
+  const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*(?:alt=["']([^"']*?)["'])?[^>]*>/gi;
 
   while ((match = htmlImgRegex.exec(content)) !== null) {
-    const imagePath = match[1];
+    const imagePath = match[1].split('#')[0];
     const alt = match[2] || '';
     const lineNumber = content.substring(0, match.index).split('\n').length;
 
@@ -131,39 +238,10 @@ function extractImageReferences(content, filePath) {
       path: imagePath,
       sourceFile: relativeFilePath,
       lineNumber,
-      fullMatch: match[0].substring(0, 100),
     });
   }
 
   return images;
-}
-
-/**
- * Categorize an image based on its path and alt text
- */
-function categorizeImage(image) {
-  const searchText = `${image.path} ${image.alt} ${image.sourceFile}`.toLowerCase();
-
-  for (const [category, patterns] of Object.entries(config.webappPatterns)) {
-    for (const pattern of patterns) {
-      if (pattern.test(searchText)) {
-        return category;
-      }
-    }
-  }
-
-  return 'other';
-}
-
-/**
- * Get document section from file path
- */
-function getDocSection(filePath) {
-  const parts = filePath.split(path.sep);
-  if (parts.length >= 2) {
-    return parts.slice(0, 2).join('/');
-  }
-  return parts[0] || 'root';
 }
 
 /**
@@ -180,7 +258,6 @@ async function findMarkdownFiles(dir) {
         const fullPath = path.join(currentDir, entry.name);
 
         if (entry.isDirectory()) {
-          // Skip hidden directories and node_modules
           if (entry.name.startsWith('.') || entry.name === 'node_modules') {
             continue;
           }
@@ -191,9 +268,8 @@ async function findMarkdownFiles(dir) {
           }
         }
       }
-      // eslint-disable-next-line no-unused-vars
-    } catch (err) {
-      // Ignore directory read errors
+    } catch {
+      // Ignore
     }
   }
 
@@ -202,35 +278,49 @@ async function findMarkdownFiles(dir) {
 }
 
 /**
- * Scan all markdown files for image references
+ * Generate screenshot ID from image path
+ */
+function generateScreenshotId(category, imagePath) {
+  const basename = path.basename(imagePath, path.extname(imagePath));
+  const cleanName = basename
+    .replace(/[^a-zA-Z0-9-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+
+  // Avoid duplicate prefix
+  if (cleanName.startsWith(category)) {
+    return cleanName;
+  }
+  return `${category}-${cleanName}`;
+}
+
+/**
+ * Scan all markdown files
  */
 async function scanDocumentation() {
   console.log('='.repeat(60));
-  console.log('  Documentation Screenshot Scanner');
+  console.log('  Documentation Screenshot Scanner v2');
   console.log('='.repeat(60));
   console.log('');
   console.log(`Docs path: ${config.docsPath}`);
   console.log('');
 
-  // Check if docs path exists
   try {
     await fs.access(config.docsPath);
   } catch {
     console.error(`! Documentation path not found: ${config.docsPath}`);
     console.error('');
-    console.error('Set DOCS_PATH environment variable to point to your documentation folder.');
-    console.error('Example: DOCS_PATH=/path/to/documentation/docs node scan-docs.js');
+    console.error('Set DOCS_PATH in your .env file or as environment variable.');
     process.exit(1);
   }
 
-  // Find all markdown files
   console.log('Finding markdown files...');
   const mdFiles = await findMarkdownFiles(config.docsPath);
   results.totalFiles = mdFiles.length;
   console.log(`  Found ${mdFiles.length} markdown files`);
   console.log('');
 
-  // Scan each file
   console.log('Scanning for image references...');
   for (const file of mdFiles) {
     try {
@@ -240,86 +330,39 @@ async function scanDocumentation() {
       for (const image of images) {
         results.totalImages++;
 
-        // Categorize
-        const category = categorizeImage(image);
-        results.byCategory[category].push(image);
+        // Determine if it's a webapp screenshot
+        const category = getWebappCategory(image.path, image.sourceFile);
+
+        if (category) {
+          results.webappScreenshots[category].push(image);
+        } else {
+          results.otherImages.push(image);
+        }
 
         // Track by doc section
-        const section = getDocSection(image.sourceFile);
+        const section = image.sourceFile.split(/[\\/]/).slice(0, 2).join('/');
         if (!results.byDocSection[section]) {
-          results.byDocSection[section] = [];
+          results.byDocSection[section] = { webapp: 0, other: 0 };
         }
-        results.byDocSection[section].push({ ...image, category });
+        if (category) {
+          results.byDocSection[section].webapp++;
+        } else {
+          results.byDocSection[section].other++;
+        }
       }
-      // eslint-disable-next-line no-unused-vars
-    } catch (err) {
-      // Skip files that can't be read
+    } catch {
+      // Skip
     }
   }
 
+  const webappTotal = Object.values(results.webappScreenshots).reduce(
+    (sum, arr) => sum + arr.length,
+    0
+  );
   console.log(`  Found ${results.totalImages} image references`);
+  console.log(`  Webapp screenshots: ${webappTotal}`);
+  console.log(`  Other images: ${results.otherImages.length}`);
   console.log('');
-}
-
-/**
- * Generate screenshot ID from image path
- */
-function generateScreenshotId(image) {
-  const basename = path.basename(image.path, path.extname(image.path));
-  // Clean up the name
-  return basename
-    .replace(/[^a-zA-Z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase();
-}
-
-/**
- * Try to infer the webapp URL path from the image
- */
-function inferUrlPath(image) {
-  const imagePath = image.path.toLowerCase();
-  const alt = (image.alt || '').toLowerCase();
-
-  // Common patterns
-  if (imagePath.includes('dashboard') || alt.includes('dashboard')) {
-    return '#/dashboard';
-  }
-  if (imagePath.includes('process-definition') || alt.includes('process definition')) {
-    return '#/process-definition/{processDefinitionKey}';
-  }
-  if (imagePath.includes('process-instance') || alt.includes('process instance')) {
-    return '#/process-instance/{processInstanceId}';
-  }
-  if (imagePath.includes('decision') || alt.includes('decision')) {
-    return '#/decisions';
-  }
-  if (imagePath.includes('deployment') || alt.includes('deployment')) {
-    return '#/repository';
-  }
-  if (imagePath.includes('batch')) {
-    return '#/batch';
-  }
-  if (imagePath.includes('migration')) {
-    return '#/migration';
-  }
-  if (imagePath.includes('user')) {
-    return '#/users';
-  }
-  if (imagePath.includes('group')) {
-    return '#/groups';
-  }
-  if (imagePath.includes('tenant')) {
-    return '#/tenants';
-  }
-  if (imagePath.includes('authorization')) {
-    return '#/authorization';
-  }
-  if (imagePath.includes('system')) {
-    return '#/system';
-  }
-
-  return '#/';
 }
 
 /**
@@ -333,56 +376,57 @@ function generateCategoryConfig(category, images) {
     welcome: '/operaton/app/welcome/default',
   };
 
-  const screenshots = images.map(image => {
-    const id = generateScreenshotId(image);
-    const urlPath = inferUrlPath(image);
+  const screenshots = [];
+  const seenOutputFiles = new Set();
 
-    return {
-      id: `${category}-${id}`,
+  for (const image of images) {
+    // Normalize output file path
+    let outputFile = image.path;
+    if (outputFile.startsWith('/')) {
+      outputFile = outputFile.substring(1);
+    }
+
+    // Skip duplicates
+    if (seenOutputFiles.has(outputFile)) {
+      continue;
+    }
+    seenOutputFiles.add(outputFile);
+
+    const urlPath = inferUrlPath(category, image.path);
+
+    screenshots.push({
+      id: generateScreenshotId(category, image.path),
       category,
-      description: image.alt || `Screenshot from ${image.sourceFile}`,
+      description:
+        image.alt || path.basename(image.path, path.extname(image.path)).replace(/[-_]/g, ' '),
       path: urlPath,
-      outputFile: image.path.startsWith('/') ? image.path.substring(1) : image.path,
+      outputFile,
       sourceDoc: image.sourceFile,
       sourceLine: image.lineNumber,
-      // Mark as needing review if URL couldn't be determined
-      needsReview: urlPath === '#/',
-    };
-  });
-
-  // Remove duplicates by outputFile
-  const unique = [];
-  const seen = new Set();
-  for (const s of screenshots) {
-    if (!seen.has(s.outputFile)) {
-      seen.add(s.outputFile);
-      unique.push(s);
-    }
+      needsReview: urlPath.includes('{'),
+    });
   }
 
   return {
     version: '1.0.0',
-    description: `Screenshot definitions for ${category} webapp - generated from documentation`,
+    description: `${category.charAt(0).toUpperCase() + category.slice(1)} webapp screenshots - generated from documentation`,
     generatedAt: new Date().toISOString(),
     categories: {
       [category]: {
         description: `${category.charAt(0).toUpperCase() + category.slice(1)} webapp screenshots`,
-        baseUrl: baseUrls[category] || '/operaton/app/cockpit/default',
+        baseUrl: baseUrls[category],
       },
     },
-    screenshots: unique,
+    screenshots,
     users: [],
     groups: [],
   };
 }
 
 /**
- * Generate combined config with all categories
+ * Generate combined config
  */
 function generateCombinedConfig() {
-  const allScreenshots = [];
-  const categories = {};
-
   const baseUrls = {
     cockpit: '/operaton/app/cockpit/default',
     tasklist: '/operaton/app/tasklist/default',
@@ -390,8 +434,12 @@ function generateCombinedConfig() {
     welcome: '/operaton/app/welcome/default',
   };
 
-  for (const [category, images] of Object.entries(results.byCategory)) {
-    if (category === 'other' || images.length === 0) continue;
+  const categories = {};
+  const allScreenshots = [];
+  const seenOutputFiles = new Set();
+
+  for (const [category, images] of Object.entries(results.webappScreenshots)) {
+    if (images.length === 0) continue;
 
     categories[category] = {
       description: `${category.charAt(0).toUpperCase() + category.slice(1)} webapp screenshots`,
@@ -399,38 +447,38 @@ function generateCombinedConfig() {
     };
 
     for (const image of images) {
-      const id = generateScreenshotId(image);
-      const urlPath = inferUrlPath(image);
+      let outputFile = image.path;
+      if (outputFile.startsWith('/')) {
+        outputFile = outputFile.substring(1);
+      }
+
+      if (seenOutputFiles.has(outputFile)) {
+        continue;
+      }
+      seenOutputFiles.add(outputFile);
+
+      const urlPath = inferUrlPath(category, image.path);
 
       allScreenshots.push({
-        id: `${category}-${id}`,
+        id: generateScreenshotId(category, image.path),
         category,
-        description: image.alt || `Screenshot from ${image.sourceFile}`,
+        description:
+          image.alt || path.basename(image.path, path.extname(image.path)).replace(/[-_]/g, ' '),
         path: urlPath,
-        outputFile: image.path.startsWith('/') ? image.path.substring(1) : image.path,
+        outputFile,
         sourceDoc: image.sourceFile,
         sourceLine: image.lineNumber,
-        needsReview: urlPath === '#/',
+        needsReview: urlPath.includes('{'),
       });
-    }
-  }
-
-  // Remove duplicates
-  const unique = [];
-  const seen = new Set();
-  for (const s of allScreenshots) {
-    if (!seen.has(s.outputFile)) {
-      seen.add(s.outputFile);
-      unique.push(s);
     }
   }
 
   return {
     version: '1.0.0',
-    description: 'Screenshot definitions generated from documentation scan',
+    description: 'All webapp screenshots - generated from documentation',
     generatedAt: new Date().toISOString(),
     categories,
-    screenshots: unique,
+    screenshots: allScreenshots,
     users: [],
     groups: [],
   };
@@ -440,15 +488,13 @@ function generateCombinedConfig() {
  * Write config files
  */
 async function writeConfigs() {
-  // Ensure output directory exists
   await fs.mkdir(config.outputDir, { recursive: true });
 
   console.log('Generating configuration files...');
   console.log('');
 
-  // Write per-category configs
-  for (const [category, images] of Object.entries(results.byCategory)) {
-    if (category === 'other' || images.length === 0) continue;
+  for (const [category, images] of Object.entries(results.webappScreenshots)) {
+    if (images.length === 0) continue;
 
     const categoryConfig = generateCategoryConfig(category, images);
     const outputPath = path.join(config.outputDir, `screenshots-${category}.json`);
@@ -459,13 +505,12 @@ async function writeConfigs() {
     );
   }
 
-  // Write combined config
   const combinedConfig = generateCombinedConfig();
   const combinedPath = path.join(config.outputDir, 'screenshots-all.json');
   await fs.writeFile(combinedPath, JSON.stringify(combinedConfig, null, 2));
   console.log(`  + screenshots-all.json (${combinedConfig.screenshots.length} screenshots)`);
 
-  // Write summary report
+  // Write report
   const reportPath = path.join(config.outputDir, 'scan-report.md');
   await fs.writeFile(reportPath, generateReport());
   console.log(`  + scan-report.md`);
@@ -478,114 +523,94 @@ async function writeConfigs() {
  * Generate markdown report
  */
 function generateReport() {
+  const webappTotal = Object.values(results.webappScreenshots).reduce(
+    (sum, arr) => sum + arr.length,
+    0
+  );
+
   let md = '# Documentation Screenshot Scan Report\n\n';
   md += `**Generated:** ${new Date().toISOString()}\n\n`;
   md += `**Documentation path:** ${config.docsPath}\n\n`;
 
   md += '## Summary\n\n';
   md += `- Markdown files scanned: ${results.totalFiles}\n`;
-  md += `- Total image references: ${results.totalImages}\n\n`;
+  md += `- Total image references: ${results.totalImages}\n`;
+  md += `- **Webapp screenshots: ${webappTotal}**\n`;
+  md += `- Other images: ${results.otherImages.length}\n\n`;
 
-  md += '## Images by Category\n\n';
+  md += '## Webapp Screenshots by Category\n\n';
   md += '| Category | Count |\n';
   md += '|----------|-------|\n';
 
-  for (const [category, images] of Object.entries(results.byCategory)) {
+  for (const [category, images] of Object.entries(results.webappScreenshots)) {
     md += `| ${category} | ${images.length} |\n`;
   }
+  md += `| **Total** | **${webappTotal}** |\n`;
 
-  md += '\n## Images by Documentation Section\n\n';
-
-  const sortedSections = Object.entries(results.byDocSection).sort(
-    (a, b) => b[1].length - a[1].length
-  );
-
-  for (const [section, images] of sortedSections) {
-    md += `### ${section} (${images.length} images)\n\n`;
-
-    // Group by category within section
-    const byCategory = {};
-    for (const img of images) {
-      if (!byCategory[img.category]) {
-        byCategory[img.category] = [];
-      }
-      byCategory[img.category].push(img);
-    }
-
-    for (const [cat, catImages] of Object.entries(byCategory)) {
-      md += `**${cat}:** ${catImages.length}\n`;
-    }
-    md += '\n';
-  }
-
-  md += '## Generated Config Files\n\n';
+  md += '\n## Generated Config Files\n\n';
   md += '| File | Description | Screenshots |\n';
   md += '|------|-------------|-------------|\n';
 
-  for (const [category, images] of Object.entries(results.byCategory)) {
-    if (category === 'other' || images.length === 0) continue;
-    md += `| screenshots-${category}.json | ${category} webapp screenshots | ${images.length} |\n`;
+  for (const [category, images] of Object.entries(results.webappScreenshots)) {
+    if (images.length === 0) continue;
+    md += `| screenshots-${category}.json | ${category} webapp | ${images.length} |\n`;
   }
-
-  const totalWebapp =
-    results.byCategory.cockpit.length +
-    results.byCategory.tasklist.length +
-    results.byCategory.admin.length +
-    results.byCategory.welcome.length;
-
-  md += `| screenshots-all.json | All webapp screenshots | ${totalWebapp} |\n`;
+  md += `| screenshots-all.json | All webapps | ${webappTotal} |\n`;
 
   md += '\n## Usage\n\n';
   md += '```bash\n';
-  md += '# Copy desired config to screenshots.json\n';
+  md += '# Copy desired config\n';
   md += 'cp config/generated/screenshots-cockpit.json config/screenshots.json\n';
   md += '\n';
-  md += '# Or use all screenshots\n';
+  md += '# Or use all\n';
   md += 'cp config/generated/screenshots-all.json config/screenshots.json\n';
   md += '\n';
-  md += '# Then run capture\n';
+  md += '# Capture screenshots\n';
   md += 'make capture\n';
+  md += '\n';
+  md += '# Replace in docs\n';
+  md += 'make replace-screenshots-live\n';
   md += '```\n';
 
   md += '\n## Notes\n\n';
-  md += '- Screenshots marked with `needsReview: true` need manual URL path configuration\n';
-  md += '- The `sourceDoc` and `sourceLine` fields indicate where each image is referenced\n';
+  md += '- Only images from `webapps/` documentation sections are included\n';
+  md += '- Screenshots with `needsReview: true` have dynamic URL parameters\n';
   md += '- Duplicate images (same output path) are automatically deduplicated\n';
 
   return md;
 }
 
 /**
- * Print summary to console
+ * Print summary
  */
 function printSummary() {
+  const webappTotal = Object.values(results.webappScreenshots).reduce(
+    (sum, arr) => sum + arr.length,
+    0
+  );
+
+  console.log('');
   console.log('='.repeat(60));
   console.log('  Scan Summary');
   console.log('='.repeat(60));
   console.log('');
-  console.log('Images by category:');
+  console.log('Webapp screenshots by category:');
   console.log('');
 
-  for (const [category, images] of Object.entries(results.byCategory)) {
-    const bar = '#'.repeat(Math.min(images.length, 50));
+  for (const [category, images] of Object.entries(results.webappScreenshots)) {
+    const bar = '#'.repeat(Math.min(Math.ceil(images.length / 2), 40));
     console.log(`  ${category.padEnd(10)} ${images.length.toString().padStart(4)}  ${bar}`);
   }
 
   console.log('');
+  console.log(`  Total webapp screenshots: ${webappTotal}`);
+  console.log(`  Other images (not captured): ${results.otherImages.length}`);
+  console.log('');
   console.log('='.repeat(60));
-
-  const needsReview = Object.values(results.byCategory)
-    .flat()
-    .filter(img => inferUrlPath(img) === '#/').length;
-
-  if (needsReview > 0) {
-    console.log('');
-    console.log(`! ${needsReview} screenshots need manual URL path configuration`);
-  }
 }
 
 /**
- * Main execution
+ * Main
  */
 async function main() {
   await scanDocumentation();
