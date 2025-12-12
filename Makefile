@@ -12,7 +12,7 @@
 		chaos-simulate chaos-simulate-debug status-debug analyze-debug deploy-debug  reset-debug \
 		reset-history data-debug incidents incidents-debug incidents-script incidents-service \
 		incidents-expression incidents-job simulate simulate-debug simulate-tokens simulate-history \
-		simulate-tasks 
+		simulate-tasks capture-debug capture-visible chaos-capture chaos-capture-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -190,25 +190,17 @@ incidents-job: ## Create only job/external task incidents
 # SCREENSHOT CAPTURE
 #---------------------------------------------------------------------------
 
-capture: ## Capture all screenshots (headless)
+capture: ## Capture screenshots from Operaton webapps
 	@printf "$(CYAN)Capturing screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
-capture-debug: ## Capture screenshots with visible browser (for debugging)
+capture-debug: ## Capture screenshots with debug output
 	@printf "$(CYAN)Capturing screenshots (debug mode)...$(RESET)\n"
-	HEADLESS=false DEBUG=true $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
-capture-cockpit: ## Capture only Cockpit screenshots
-	@printf "$(CYAN)Capturing Cockpit screenshots...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=cockpit
-
-capture-tasklist: ## Capture only Tasklist screenshots
-	@printf "$(CYAN)Capturing Tasklist screenshots...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=tasklist
-
-capture-admin: ## Capture only Admin screenshots
-	@printf "$(CYAN)Capturing Admin screenshots...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=admin
+capture-visible: ## Capture screenshots with visible browser (not headless)
+	@printf "$(CYAN)Capturing screenshots (visible browser)...$(RESET)\n"
+	HEADLESS=false $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
 analyze: ## Analyze documentation for screenshots to replace 
 	@printf "$(CYAN)Analyzing documentation...$(RESET)\n"
@@ -293,7 +285,16 @@ test: ## Run all tests
 	$(NODE) tests/chaos-generate-data.js
 	$(NODE) tests/chaos-create-incidents.js
 	$(NODE) tests/chaos-simulate-scenarios.js
+	$(NODE) tests/chaos-capture-screenshots.js
 	@printf "$(GREEN)✓ All tests passed$(RESET)\n"
+
+chaos-capture: ## Run chaos tests for capture-screenshots
+	@printf "$(CYAN)Running chaos tests for capture-screenshots...$(RESET)\n"
+	$(NODE) tests/chaos-capture-screenshots.js
+
+chaos-capture-debug:  # Hidden - use DEBUG=true make chaos-capture
+	@printf "$(CYAN)Running chaos tests for capture-screenshots (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-capture-screenshots.js
 
 chaos-check: ## Run chaos tests for check-connection
 	@printf "$(CYAN)Running chaos tests for check-connection...$(RESET)\n"
