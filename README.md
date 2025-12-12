@@ -79,11 +79,11 @@ Run `make help` to see all available commands:
 
 ### Incident Creation
 
-| Command                  | Description                   |
-| ------------------------ | ----------------------------- |
-| `make incidents`         | Create all types of incidents |
-| `make incidents-script`  | Script task failures only     |
-| `make incidents-service` | Service task failures only    |
+| Command                  | Description                   | Docs                           |
+| ------------------------ | ----------------------------- | ------------------------------ |
+| `make incidents`         | Create all types of incidents | [📖](docs/create-incidents.md) |
+| `make incidents-script`  | Script task failures only     |                                |
+| `make incidents-service` | Service task failures only    |                                |
 
 ### Screenshot Capture
 
