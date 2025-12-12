@@ -6,13 +6,13 @@
 # Run 'make help' to see all available targets
 
 .PHONY: help install setup deploy data incidents simulate capture analyze reset clean all \
-        check check-debug test test-check chaos-check chaos-check-debug status-debug \
-		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug \
-		deploy-debug chaos-deploy chaos-deploy-debug reset-debug reset-history chaos-reset \
-		chaos-reset-debug data-debug chaos-data chaos-data-debug incidents incidents-debug \
-		incidents-script incidents-service incidents-expression incidents-job chaos-incidents \
-		chaos-incidents-debug simulate simulate-debug simulate-tokens simulate-history \
-		simulate-tasks chaos-simulate chaos-simulate-debug
+        check check-debug test chaos-check chaos-check-debug chaos-status chaos-status-debug \
+		chaos-analyze chaos-analyze-debug chaos-deploy chaos-deploy-debug chaos-reset chaos-reset-debug \
+		chaos-data chaos-data-debug chaos-incidents chaos-incidents-debug testing-tip \
+		chaos-simulate chaos-simulate-debug status-debug analyze-debug deploy-debug  reset-debug \
+		reset-history data-debug incidents incidents-debug incidents-script incidents-service \
+		incidents-expression incidents-job simulate simulate-debug simulate-tokens simulate-history \
+		simulate-tasks 
 
 # Default target
 .DEFAULT_GOAL := help
