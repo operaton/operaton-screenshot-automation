@@ -71,11 +71,11 @@ Run `make help` to see all available commands:
 
 ### Simulation Scenarios
 
-| Command                 | Description                                    |
-| ----------------------- | ---------------------------------------------- |
-| `make simulate`         | Run all simulation scenarios                   |
-| `make simulate-tokens`  | Create instances with tokens at various stages |
-| `make simulate-history` | Generate completed instances for history views |
+| Command                 | Description                                    | Docs                             |
+| ----------------------- | ---------------------------------------------- | -------------------------------- |
+| `make simulate`         | Run all simulation scenarios                   | [📖](docs/simulate-scenarios.md) |
+| `make simulate-tokens`  | Create instances with tokens at various stages |                                  |
+| `make simulate-history` | Generate completed instances for history views |                                  |
 
 ### Incident Creation
 

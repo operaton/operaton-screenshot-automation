@@ -6,12 +6,13 @@
 # Run 'make help' to see all available targets
 
 .PHONY: help install setup deploy data incidents simulate capture analyze reset clean all \
-        check check-debug test test-check chaos-check chaos-check-debug status-debug \
-		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug \
-		deploy-debug chaos-deploy chaos-deploy-debug reset-debug reset-history chaos-reset \
-		chaos-reset-debug data-debug chaos-data chaos-data-debug incidents incidents-debug \
-		incidents-script incidents-service incidents-expression incidents-job chaos-incidents \
-		chaos-incidents-debug
+        check check-debug test chaos-check chaos-check-debug chaos-status chaos-status-debug \
+		chaos-analyze chaos-analyze-debug chaos-deploy chaos-deploy-debug chaos-reset chaos-reset-debug \
+		chaos-data chaos-data-debug chaos-incidents chaos-incidents-debug testing-tip \
+		chaos-simulate chaos-simulate-debug status-debug analyze-debug deploy-debug  reset-debug \
+		reset-history data-debug incidents incidents-debug incidents-script incidents-service \
+		incidents-expression incidents-job simulate simulate-debug simulate-tokens simulate-history \
+		simulate-tasks 
 
 # Default target
 .DEFAULT_GOAL := help
@@ -141,17 +142,25 @@ data-debug: ## Generate test data (users, process instances, tasks) with debug o
 	@printf "$(CYAN)Generating test data (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/generate-data.js
 
-simulate: ## Run simulation scenarios (tokens, history, tasks)
-	@printf "$(CYAN)Running simulation scenarios...$(RESET)\n"
+simulate: ## Simulate various process scenarios for screenshots
+	@printf "$(CYAN)Simulating scenarios...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js
 
-simulate-tokens: ## Simulate processes with visible tokens at various stages
+simulate-debug: ## Simulate scenarios with debug output
+	@printf "$(CYAN)Simulating scenarios (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js
+
+simulate-tokens: ## Simulate only token position scenarios
 	@printf "$(CYAN)Simulating token positions...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js --tokens
 
-simulate-history: ## Generate completed instances for history views
-	@printf "$(CYAN)Generating history data...$(RESET)\n"
+simulate-history: ## Simulate only history data scenarios
+	@printf "$(CYAN)Simulating history data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js --history
+
+simulate-tasks: ## Simulate only task state scenarios
+	@printf "$(CYAN)Simulating task states...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js --tasks
 
 incidents: ## Create incidents for screenshot capture 
 	@printf "$(CYAN)Creating incidents...$(RESET)\n"
@@ -283,6 +292,7 @@ test: ## Run all tests
 	$(NODE) tests/chaos-reset-environment.js
 	$(NODE) tests/chaos-generate-data.js
 	$(NODE) tests/chaos-create-incidents.js
+	$(NODE) tests/chaos-simulate-scenarios.js
 	@printf "$(GREEN)✓ All tests passed$(RESET)\n"
 
 chaos-check: ## Run chaos tests for check-connection
@@ -340,6 +350,14 @@ chaos-incidents: ## Run chaos tests for create-incidents
 chaos-incidents-debug:  # Hidden - use DEBUG=true make chaos-incidents
 	@printf "$(CYAN)Running chaos tests for create-incidents (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-create-incidents.js
+
+chaos-simulate: ## Run chaos tests for simulate-scenarios
+	@printf "$(CYAN)Running chaos tests for simulate-scenarios...$(RESET)\n"
+	$(NODE) tests/chaos-simulate-scenarios.js
+
+chaos-simulate-debug:  # Hidden - use DEBUG=true make chaos-simulate
+	@printf "$(CYAN)Running chaos tests for simulate-scenarios (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-simulate-scenarios.js
 
 testing-tip: ## Tip: Add DEBUG=true for verbose output (e.g., DEBUG=true make chaos-check)
 	@:
