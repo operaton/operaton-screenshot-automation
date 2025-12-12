@@ -100,20 +100,20 @@ setup: install ## Full setup: install dependencies and create .env file
 	fi
 	@printf "$(GREEN)✓ Setup complete$(RESET)\n"
 
-check: ## Check connection to Operaton instance (MERGED)
+check: ## Check connection to Operaton instance 
 	@printf "$(CYAN)Checking Operaton connection...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/check-connection.js
 
-check-debug: ## Check connection to Operaton instance with debug output (MERGED)
+check-debug: ## Check connection to Operaton instance with debug output 
 	@printf "$(CYAN)Checking Operaton connection (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/check-connection.js
 
-status: ## Show current status of Operaton (MERGED)
+status: ## Show current status of Operaton 
 	@printf "$(CYAN)Operaton Environment Status$(RESET)\n"
 	@echo "============================"
 	@$(NODE) $(SCRIPTS_DIR)/show-status.js
 
-status-debug: ## Show current status of Operaton with debug output (MERGED)
+status-debug: ## Show current status of Operaton with debug output 
 	@printf "$(CYAN)Showing Operaton status (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/show-status.js
 
@@ -121,11 +121,11 @@ status-debug: ## Show current status of Operaton with debug output (MERGED)
 # DEPLOYMENT & DATA GENERATION
 #---------------------------------------------------------------------------
 
-deploy: ## Deploy BPMN/DMN processes to Operaton (MERGED)
+deploy: ## Deploy BPMN/DMN processes to Operaton 
 	@printf "$(CYAN)Deploying processes...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/deploy-processes.js
 
-deploy-debug: ## Deploy BPMN/DMN processes to Operaton with debug output (MERGED)
+deploy-debug: ## Deploy BPMN/DMN processes to Operaton with debug output 
 	@printf "$(CYAN)Deploying processes (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/deploy-processes.js
 
@@ -133,11 +133,11 @@ users: ## Create users and groups only
 	@printf "$(CYAN)Creating users and groups...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/generate-data.js --users-only
 
-data: ## Generate test data (users, process instances, tasks) (MERGED)
+data: ## Generate test data (users, process instances, tasks) 
 	@printf "$(CYAN)Generating test data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/generate-data.js
 
-data-debug: ## Generate test data (users, process instances, tasks) with debug output (MERGED)
+data-debug: ## Generate test data (users, process instances, tasks) with debug output 
 	@printf "$(CYAN)Generating test data (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/generate-data.js
 
@@ -153,27 +153,27 @@ simulate-history: ## Generate completed instances for history views
 	@printf "$(CYAN)Generating history data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js --history
 
-incidents: ## Create incidents for screenshot capture (MERGED)
+incidents: ## Create incidents for screenshot capture 
 	@printf "$(CYAN)Creating incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js
 
-incidents-debug: ## Create incidents with debug output (MERGED)
+incidents-debug: ## Create incidents with debug output 
 	@printf "$(CYAN)Creating incidents (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/create-incidents.js
 
-incidents-script: ## Create only script task incidents (MERGED)
+incidents-script: ## Create only script task incidents 
 	@printf "$(CYAN)Creating script task incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --script-errors
 
-incidents-service: ## Create only service task incidents (MERGED)
+incidents-service: ## Create only service task incidents 
 	@printf "$(CYAN)Creating service task incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --service-errors
 
-incidents-expression: ## Create only expression evaluation incidents (MERGED)
+incidents-expression: ## Create only expression evaluation incidents 
 	@printf "$(CYAN)Creating expression evaluation incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --expression-errors
 
-incidents-job: ## Create only job/external task incidents (MERGED)
+incidents-job: ## Create only job/external task incidents 
 	@printf "$(CYAN)Creating job/external task incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --job-errors
 
@@ -201,15 +201,15 @@ capture-admin: ## Capture only Admin screenshots
 	@printf "$(CYAN)Capturing Admin screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=admin
 
-analyze: ## Analyze documentation for screenshots to replace (MERGED)
+analyze: ## Analyze documentation for screenshots to replace 
 	@printf "$(CYAN)Analyzing documentation...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
 
-analyze-debug: ## Analyze documentation for screenshots to replace with debug output (MERGED)
+analyze-debug: ## Analyze documentation for screenshots to replace with debug output 
 	@printf "$(CYAN)Analyzing documentation (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
 
-analyze-all: ## Analyze documentation (flag ALL images for replacement) (MERGED)
+analyze-all: ## Analyze documentation (flag ALL images for replacement) 
 	@printf "$(CYAN)Analyzing documentation (replace all mode)...$(RESET)\n"
 	REPLACE_ALL=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
 
@@ -217,33 +217,33 @@ analyze-all: ## Analyze documentation (flag ALL images for replacement) (MERGED)
 # CLEANUP & RESET
 #---------------------------------------------------------------------------
 
-reset: ## Reset Operaton: delete all deployments, instances, and users (MERGED)
+reset: ## Reset Operaton: delete all deployments, instances, and users 
 	@printf "$(RED)WARNING: This will delete ALL data from Operaton!$(RESET)\n"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	@printf "$(CYAN)Resetting Operaton environment...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js
 
-reset-instances: ## Delete all process instances only (MERGED)
+reset-instances: ## Delete all process instances only 
 	@printf "$(CYAN)Deleting all process instances...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --instances-only
 
-reset-deployments: ## Delete all deployments only (MERGED)
+reset-deployments: ## Delete all deployments only 
 	@printf "$(CYAN)Deleting all deployments...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --deployments-only
 
-reset-users: ## Delete created test users only (MERGED)
+reset-users: ## Delete created test users only 
 	@printf "$(CYAN)Deleting test users...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --users-only
 
-reset-force: ## Force reset without confirmation prompt (MERGED)
+reset-force: ## Force reset without confirmation prompt 
 	@printf "$(CYAN)Force resetting Operaton environment...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --force
 
-reset-debug: ## Reset environment with debug output (MERGED)
+reset-debug: ## Reset environment with debug output 
 	@printf "$(CYAN)Resetting environment (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) $(SCRIPTS_DIR)/reset-environment.js --force
 
-reset-history: ## Reset only history data (MERGED)
+reset-history: ## Reset only history data 
 	@printf "$(CYAN)Resetting history data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/reset-environment.js --force --history-only
 
