@@ -9,7 +9,9 @@
         check check-debug test test-check chaos-check chaos-check-debug status-debug \
 		chaos-status chaos-status-debug analyze-debug chaos-analyze chaos-analyze-debug \
 		deploy-debug chaos-deploy chaos-deploy-debug reset-debug reset-history chaos-reset \
-		chaos-reset-debug data-debug chaos-data chaos-data-debug
+		chaos-reset-debug data-debug chaos-data chaos-data-debug incidents incidents-debug \
+		incidents-script incidents-service incidents-expression incidents-job chaos-incidents \
+		chaos-incidents-debug
 
 # Default target
 .DEFAULT_GOAL := help
@@ -151,17 +153,29 @@ simulate-history: ## Generate completed instances for history views
 	@printf "$(CYAN)Generating history data...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/simulate-scenarios.js --history
 
-incidents: ## Create intentional incidents (failed jobs, errors)
+incidents: ## Create incidents for screenshot capture (MERGED)
 	@printf "$(CYAN)Creating incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js
 
-incidents-script: ## Create incidents via failing script tasks
+incidents-debug: ## Create incidents with debug output (MERGED)
+	@printf "$(CYAN)Creating incidents (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/create-incidents.js
+
+incidents-script: ## Create only script task incidents (MERGED)
 	@printf "$(CYAN)Creating script task incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --script-errors
 
-incidents-service: ## Create incidents via failing service tasks
+incidents-service: ## Create only service task incidents (MERGED)
 	@printf "$(CYAN)Creating service task incidents...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --service-errors
+
+incidents-expression: ## Create only expression evaluation incidents (MERGED)
+	@printf "$(CYAN)Creating expression evaluation incidents...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --expression-errors
+
+incidents-job: ## Create only job/external task incidents (MERGED)
+	@printf "$(CYAN)Creating job/external task incidents...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/create-incidents.js --job-errors
 
 #---------------------------------------------------------------------------
 # SCREENSHOT CAPTURE
@@ -262,68 +276,73 @@ fresh: reset-force deploy data simulate incidents capture ## Fresh start: reset 
 
 test: ## Run all tests
 	@printf "$(CYAN)Running all tests...$(RESET)\n"
-	$(NODE) tests/chaos-analyze-documentation.js
 	$(NODE) tests/chaos-check-connection.js
 	$(NODE) tests/chaos-show-status.js
+	$(NODE) tests/chaos-analyze-documentation.js
 	$(NODE) tests/chaos-deploy-processes.js
-	$(NODE) tests/chaos-generate-data.js
 	$(NODE) tests/chaos-reset-environment.js
-	@printf "$(GREEN)All tests passed$(RESET)\n"
+	$(NODE) tests/chaos-generate-data.js
+	$(NODE) tests/chaos-create-incidents.js
+	@printf "$(GREEN)✓ All tests passed$(RESET)\n"
 
-test-analyze: chaos-analyze ## Alias for chaos-analyze
-test-check: chaos-check ## Alias for chaos-check
-test-deploy: chaos-deploy ## Alias for chaos-deploy
-test-status: chaos-status ## Alias for chaos-status
-test-reset: chaos-reset ## Alias for chaos-reset
-test-data: chaos-data ## Alias for chaos-data
+chaos-check: ## Run chaos tests for check-connection
+	@printf "$(CYAN)Running chaos tests for check-connection...$(RESET)\n"
+	$(NODE) tests/chaos-check-connection.js
 
-chaos-analyze: ## Run chaos tests for analyze-documentation (MERGED)
+chaos-check-debug:  # Hidden - use DEBUG=true make chaos-check
+	@printf "$(CYAN)Running chaos tests for check-connection (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-check-connection.js
+
+chaos-status: ## Run chaos tests for show-status
+	@printf "$(CYAN)Running chaos tests for show-status...$(RESET)\n"
+	$(NODE) tests/chaos-show-status.js
+
+chaos-status-debug:  # Hidden - use DEBUG=true make chaos-status
+	@printf "$(CYAN)Running chaos tests for show-status (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-show-status.js
+
+chaos-analyze: ## Run chaos tests for analyze-documentation
 	@printf "$(CYAN)Running chaos tests for analyze-documentation...$(RESET)\n"
 	$(NODE) tests/chaos-analyze-documentation.js
 
-chaos-analyze-debug: ## Run chaos tests for analyze-documentation with debug output (MERGED)
+chaos-analyze-debug:  # Hidden - use DEBUG=true make chaos-analyze
 	@printf "$(CYAN)Running chaos tests for analyze-documentation (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-analyze-documentation.js
 
-chaos-check: ## Run chaos tests for checking Operaton instance (MERGED)
-	@printf "$(CYAN)Running chaos tests for checking Operaton connection...$(RESET)\n"
-	$(NODE) tests/chaos-check-connection.js
-
-chaos-check-debug: ## Run chaos tests for checking Operaton instance with debug output (MERGED)
-	@printf "$(CYAN)Running chaos tests for checking Operaton connection (debug mode)...$(RESET)\n"
-	DEBUG=true $(NODE) tests/chaos-check-connection.js
-
-chaos-data: ## Run chaos tests for generating test data (MERGED)
-	@printf "$(CYAN)Running chaos tests for generate-data...$(RESET)\n"
-	$(NODE) tests/chaos-generate-data.js
-
-chaos-data-debug: ## Run chaos tests for generating test data with debug output (MERGED)
-	@printf "$(CYAN)Running chaos tests for generate-data (debug mode)...$(RESET)\n"
-	DEBUG=true $(NODE) tests/chaos-generate-data.js
-
-chaos-deploy: ## Run chaos tests for Deploy BPMN/DMN processes to Operaton (MERGED)
+chaos-deploy: ## Run chaos tests for deploy-processes
 	@printf "$(CYAN)Running chaos tests for deploy-processes...$(RESET)\n"
 	$(NODE) tests/chaos-deploy-processes.js
 
-chaos-deploy-debug: ## Run chaos tests for Deploy BPMN/DMN processes to Operaton with debug output (MERGED)
+chaos-deploy-debug:  # Hidden - use DEBUG=true make chaos-deploy
 	@printf "$(CYAN)Running chaos tests for deploy-processes (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-deploy-processes.js
 
-chaos-reset: ## Run chaos tests for Reset Operaton (MERGED)
+chaos-reset: ## Run chaos tests for reset-environment
 	@printf "$(CYAN)Running chaos tests for reset-environment...$(RESET)\n"
 	$(NODE) tests/chaos-reset-environment.js
 
-chaos-reset-debug: ## Run chaos tests for reset Operaton with debug output (MERGED)
+chaos-reset-debug:  # Hidden - use DEBUG=true make chaos-reset
 	@printf "$(CYAN)Running chaos tests for reset-environment (debug mode)...$(RESET)\n"
 	DEBUG=true $(NODE) tests/chaos-reset-environment.js
 
-chaos-status: ## Run chaos tests for showing current status of Operaton (MERGED)
-	@printf "$(CYAN)Running chaos tests for showing Operaton status...$(RESET)\n"
-	$(NODE) tests/chaos-show-status.js
+chaos-data: ## Run chaos tests for generate-data
+	@printf "$(CYAN)Running chaos tests for generate-data...$(RESET)\n"
+	$(NODE) tests/chaos-generate-data.js
 
-chaos-status-debug: ## Run chaos tests for showing current status of Operaton with debug output (MERGED)
-	@printf "$(CYAN)Running chaos tests for showing Operaton status (debug mode)...$(RESET)\n"
-	DEBUG=true $(NODE) tests/chaos-show-status.js
+chaos-data-debug:  # Hidden - use DEBUG=true make chaos-data
+	@printf "$(CYAN)Running chaos tests for generate-data (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-generate-data.js
+
+chaos-incidents: ## Run chaos tests for create-incidents
+	@printf "$(CYAN)Running chaos tests for create-incidents...$(RESET)\n"
+	$(NODE) tests/chaos-create-incidents.js
+
+chaos-incidents-debug:  # Hidden - use DEBUG=true make chaos-incidents
+	@printf "$(CYAN)Running chaos tests for create-incidents (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-create-incidents.js
+
+testing-tip: ## Tip: Add DEBUG=true for verbose output (e.g., DEBUG=true make chaos-check)
+	@:
 
 #---------------------------------------------------------------------------
 # CODE QUALITY
