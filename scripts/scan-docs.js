@@ -32,9 +32,6 @@ const config = {
   imageExtensions: ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'],
 };
 
-// Patterns that indicate Camunda branding (need replacement)
-const camundaPatterns = [/camunda/i, /cawemo/i];
-
 // Results storage
 const results = {
   totalFiles: 0,
@@ -46,31 +43,11 @@ const results = {
     welcome: [],
   },
   otherImages: [],
-  camundaBranded: [],
-  alreadyOperaton: [],
   statistics: {
     byCategory: {},
     byDocSection: {},
-    needsReplacement: 0,
-    alreadyReplaced: 0,
   },
 };
-
-/**
- * Check if image appears to be Camunda-branded
- */
-function isCamundaBranded(imagePath, alt = '') {
-  const searchText = `${imagePath} ${alt}`.toLowerCase();
-  return camundaPatterns.some(pattern => pattern.test(searchText));
-}
-
-/**
- * Check if image appears to be Operaton-branded
- */
-function isOperatonBranded(imagePath, alt = '') {
-  const searchText = `${imagePath} ${alt}`.toLowerCase();
-  return /operaton/i.test(searchText);
-}
 
 /**
  * Determine webapp category from image path
@@ -346,18 +323,6 @@ async function scanDocumentation() {
       for (const image of images) {
         results.totalImages++;
 
-        // Check branding
-        const isCamunda = isCamundaBranded(image.path, image.alt);
-        const isOperaton = isOperatonBranded(image.path, image.alt);
-
-        if (isCamunda) {
-          results.camundaBranded.push(image);
-          results.statistics.needsReplacement++;
-        } else if (isOperaton) {
-          results.alreadyOperaton.push(image);
-          results.statistics.alreadyReplaced++;
-        }
-
         // Determine category
         const category = getWebappCategory(image.path, image.sourceFile);
 
@@ -386,8 +351,6 @@ async function scanDocumentation() {
   console.log(`  Total images: ${results.totalImages}`);
   console.log(`  Webapp screenshots: ${webappTotal}`);
   console.log(`  Other images: ${results.otherImages.length}`);
-  console.log(`  Camunda-branded: ${results.camundaBranded.length}`);
-  console.log(`  Operaton-branded: ${results.alreadyOperaton.length}`);
   console.log('');
 }
 
@@ -527,11 +490,6 @@ function generateScanReport() {
   md += `- Webapp screenshots: ${webappTotal}\n`;
   md += `- Other images: ${results.otherImages.length}\n\n`;
 
-  md += '## Branding Analysis\n\n';
-  md += `- Camunda-branded (need replacement): ${results.camundaBranded.length}\n`;
-  md += `- Operaton-branded (already updated): ${results.alreadyOperaton.length}\n`;
-  md += `- Neutral (no branding detected): ${results.totalImages - results.camundaBranded.length - results.alreadyOperaton.length}\n\n`;
-
   md += '## Webapp Screenshots by Category\n\n';
   md += '```\n';
   md += 'Category     Count\n';
@@ -570,54 +528,6 @@ function generateScanReport() {
 }
 
 /**
- * Generate replacement plan (Camunda -> Operaton analysis)
- */
-function generateReplacementPlan() {
-  let md = '# Screenshot Replacement Plan\n\n';
-  md += `**Generated:** ${new Date().toISOString()}\n\n`;
-
-  md += '## Overview\n\n';
-  md += `This document identifies screenshots that need to be replaced with Operaton versions.\n\n`;
-
-  md += '## Statistics\n\n';
-  md += `- Total images scanned: ${results.totalImages}\n`;
-  md += `- Camunda-branded (ACTION NEEDED): ${results.camundaBranded.length}\n`;
-  md += `- Operaton-branded (already done): ${results.alreadyOperaton.length}\n`;
-  md += `- Neutral/other: ${results.totalImages - results.camundaBranded.length - results.alreadyOperaton.length}\n\n`;
-
-  if (results.camundaBranded.length > 0) {
-    md += '## Camunda-Branded Images (Need Replacement)\n\n';
-
-    // Group by source file
-    const byFile = {};
-    for (const img of results.camundaBranded) {
-      if (!byFile[img.sourceFile]) {
-        byFile[img.sourceFile] = [];
-      }
-      byFile[img.sourceFile].push(img);
-    }
-
-    for (const [file, images] of Object.entries(byFile).sort()) {
-      md += `### ${file}\n\n`;
-      for (const img of images) {
-        md += `- Line ${img.lineNumber}: \`${path.basename(img.path)}\`\n`;
-      }
-      md += '\n';
-    }
-  } else {
-    md += '## Status: No Camunda-branded images found!\n\n';
-    md += 'All screenshots appear to be either Operaton-branded or neutral.\n';
-  }
-
-  if (results.alreadyOperaton.length > 0) {
-    md += '## Already Operaton-Branded (No Action Needed)\n\n';
-    md += `${results.alreadyOperaton.length} images already contain Operaton branding.\n\n`;
-  }
-
-  return md;
-}
-
-/**
  * Write all output files
  */
 async function writeOutputs() {
@@ -651,11 +561,6 @@ async function writeOutputs() {
   await fs.writeFile(scanReportPath, generateScanReport());
   console.log(`  + scan-report.md`);
 
-  // Write replacement plan
-  const replacementPlanPath = path.join(config.outputDir, 'replacement-plan.md');
-  await fs.writeFile(replacementPlanPath, generateReplacementPlan());
-  console.log(`  + replacement-plan.md`);
-
   console.log('');
 }
 
@@ -684,17 +589,12 @@ function printSummary() {
   console.log(`  Total webapp screenshots: ${webappTotal}`);
   console.log(`  Other images: ${results.otherImages.length}`);
   console.log('');
-  console.log('Branding analysis:');
-  console.log(`  Camunda-branded (need replacement): ${results.camundaBranded.length}`);
-  console.log(`  Operaton-branded (already done): ${results.alreadyOperaton.length}`);
-  console.log('');
   console.log('='.repeat(60));
   console.log('');
   console.log('Next steps:');
-  console.log('  1. Review output/scan/replacement-plan.md');
-  console.log('  2. Copy a config: cp output/scan/screenshots-admin.json config/screenshots.json');
-  console.log('  3. Capture: make capture');
-  console.log('  4. Replace: make replace-screenshots-live');
+  console.log('  1. Copy a config: cp output/scan/screenshots-admin.json config/screenshots.json');
+  console.log('  2. Capture: make capture');
+  console.log('  3. Replace: make replace-screenshots-live');
 }
 
 /**

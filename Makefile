@@ -60,8 +60,14 @@ help: ## Show this help message
 	@printf "$(GREEN)Deployment & Data:$(RESET)\n"
 	@grep -E '^(deploy|data|users|incidents|simulate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@printf "\n"
+	@printf "$(GREEN)Scan Documentation:$(RESET)\n"
+	@grep -E '^(scan-docs):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
 	@printf "$(GREEN)Screenshot Capture:$(RESET)\n"
-	@grep -E '^(capture|analyze):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(capture):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Replace Screenshots:$(RESET)\n"
+	@grep -E '^(replace-screenshots|replace-screenshots-live):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@printf "\n"
 	@printf "$(GREEN)Code Quality:$(RESET)\n"
 	@grep -E '^(lint|format|validate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -204,18 +210,6 @@ capture-visible: ## Capture screenshots with visible browser (not headless)
 	@printf "$(CYAN)Capturing screenshots (visible browser)...$(RESET)\n"
 	HEADLESS=false $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
-analyze: ## Analyze documentation for screenshots to replace 
-	@printf "$(CYAN)Analyzing documentation...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
-
-analyze-debug: ## Analyze documentation for screenshots to replace with debug output 
-	@printf "$(CYAN)Analyzing documentation (debug mode)...$(RESET)\n"
-	DEBUG=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
-
-analyze-all: ## Analyze documentation (flag ALL images for replacement) 
-	@printf "$(CYAN)Analyzing documentation (replace all mode)...$(RESET)\n"
-	REPLACE_ALL=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
-
 #---------------------------------------------------------------------------
 # CLEANUP & RESET
 #---------------------------------------------------------------------------
@@ -266,6 +260,7 @@ scan-docs: ## Scan documentation for screenshots (output: output/scan/)
 	@printf "$(CYAN)Scanning documentation for screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/scan-docs.js
 
+
 #---------------------------------------------------------------------------
 # SCREENSHOT REPLACEMENT
 # Replaces screenshots in documentation with captured ones
@@ -285,6 +280,7 @@ replace-screenshots-verbose: ## Preview replacements with verbose output
 	@printf "$(CYAN)Previewing screenshot replacements (verbose)...$(RESET)\n"
 	VERBOSE=true $(NODE) $(SCRIPTS_DIR)/replace-screenshots.js
 
+
 #---------------------------------------------------------------------------
 # WORKFLOW SHORTCUTS
 #---------------------------------------------------------------------------
@@ -295,7 +291,7 @@ screenshots-workflow: ## Show full screenshot workflow instructions
 	@printf "1. Configure .env with DOCS_PATH and STATIC_PATH\n\n"
 	@printf "2. Scan documentation:\n"
 	@printf "   make scan-docs\n\n"
-	@printf "3. Review output/scan/replacement-plan.md\n\n"
+	@printf "3. Review output/scan/scan-report.md\n\n"
 	@printf "4. Copy a generated config:\n"
 	@printf "   cp output/scan/screenshots-admin.json config/screenshots.json\n\n"
 	@printf "5. Set up environment and capture:\n"

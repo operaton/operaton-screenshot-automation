@@ -4,12 +4,11 @@ Scan Operaton documentation for screenshots and generate capture configurations.
 
 ## Overview
 
-This unified script:
+This script:
 
 1. Scans markdown files for all image references
 2. Identifies webapp screenshots (Cockpit, Tasklist, Admin, Welcome)
-3. Detects Camunda-branded images that need replacement
-4. Generates JSON capture configurations and reports
+3. Generates JSON capture configurations and a summary report
 
 All output goes to `output/scan/` (untracked), so you can re-scan without affecting tracked files.
 
@@ -53,7 +52,6 @@ output/scan/
   screenshots-welcome.json   # Welcome webapp config
   screenshots-all.json       # All webapps combined
   scan-report.md             # Summary statistics
-  replacement-plan.md        # Camunda-branded images list
 ```
 
 ## Console Output
@@ -72,8 +70,6 @@ Scanning for image references...
   Total images: 541
   Webapp screenshots: 210
   Other images: 331
-  Camunda-branded: 15
-  Operaton-branded: 42
 
 Generating output files...
 Output directory: ./output/scan
@@ -84,7 +80,6 @@ Output directory: ./output/scan
   + screenshots-welcome.json (2 screenshots)
   + screenshots-all.json (210 screenshots)
   + scan-report.md
-  + replacement-plan.md
 
 ============================================================
   Scan Summary
@@ -100,17 +95,12 @@ Webapp screenshots by category:
   Total webapp screenshots: 210
   Other images: 331
 
-Branding analysis:
-  Camunda-branded (need replacement): 15
-  Operaton-branded (already done): 42
-
 ============================================================
 
 Next steps:
-  1. Review output/scan/replacement-plan.md
-  2. Copy a config: cp output/scan/screenshots-admin.json config/screenshots.json
-  3. Capture: make capture
-  4. Replace: make replace-screenshots-live
+  1. Copy a config: cp output/scan/screenshots-admin.json config/screenshots.json
+  2. Capture: make capture
+  3. Replace: make replace-screenshots-live
 
 + Scan complete!
 ```
@@ -121,8 +111,8 @@ Next steps:
 # 1. Scan documentation
 make scan-docs
 
-# 2. Review the replacement plan
-cat output/scan/replacement-plan.md
+# 2. Review the scan report
+cat output/scan/scan-report.md
 
 # 3. Copy desired config (admin, cockpit, tasklist, or all)
 cp output/scan/screenshots-admin.json config/screenshots.json
@@ -144,7 +134,6 @@ make replace-screenshots-live
 Command                   Output Location
 ------------------------- ---------------------------
 make scan-docs            output/scan/scan-report.md
-                          output/scan/replacement-plan.md
                           output/scan/screenshots-*.json
 
 make replace-screenshots  output/replace-report.md
