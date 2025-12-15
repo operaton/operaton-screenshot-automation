@@ -5,8 +5,9 @@ Replace captured screenshots in the Operaton documentation repository.
 ## Overview
 
 This script copies captured screenshots from the `output/screenshots/` directory to the
-documentation repository, replacing existing images with newly captured ones. It matches files by
-basename and supports both `docs/` and `static/img/` locations.
+documentation repository, replacing existing images with newly captured ones. It only replaces
+screenshots that are defined in `config/screenshots.json`, making it safe to have multiple captures
+in the output directory.
 
 ## Usage
 
@@ -36,23 +37,15 @@ VERBOSE=true node scripts/replace-screenshots.js
 
 ## Configuration
 
-All settings can be configured via `.env` file or environment variables:
-
-| Variable      | Description                                | Default                |
-| ------------- | ------------------------------------------ | ---------------------- |
-| `OUTPUT_DIR`  | Source directory with captured screenshots | `./output/screenshots` |
-| `DOCS_PATH`   | Path to documentation `docs/` folder       | (required)             |
-| `STATIC_PATH` | Path to documentation `static/img/` folder | (required)             |
-| `DRY_RUN`     | Preview mode - don't copy files            | `true`                 |
-| `VERBOSE`     | Show detailed output                       | `false`                |
-| `DEBUG`       | Enable debug output                        | `false`                |
-
-### Example .env Configuration
+Settings via `.env` file:
 
 ```bash
-# Documentation paths (required for replacement)
+# Documentation paths (required)
 DOCS_PATH=C:/Users/username/Development/documentation/docs
 STATIC_PATH=C:/Users/username/Development/documentation/static/img
+
+# Screenshot config file (default: ./config/screenshots.json)
+CONFIG_PATH=./config/screenshots.json
 
 # Safe by default - set to false to actually replace
 DRY_RUN=true
@@ -60,30 +53,30 @@ DRY_RUN=true
 
 ## How It Works
 
-1. **Build Index**: Scans the documentation repository (`docs/` and `static/img/`) for all existing
-   images
-2. **Match Files**: For each captured screenshot, finds matching files by basename in the docs
-3. **Replace**: Copies the new screenshot to all matching locations (dry run shows what would
-   happen)
-4. **Report**: Generates a markdown report with results
+1. **Load Config**: Reads `config/screenshots.json` to determine which screenshots to replace
+2. **Build Index**: Scans the documentation repository for all existing images
+3. **Filter**: Only processes screenshots that are defined in the config
+4. **Match**: Finds matching files by basename in the docs
+5. **Replace**: Copies new screenshots to matching locations (dry run shows what would happen)
+6. **Report**: Generates a markdown report with results
 
-### Matching Logic
+### Config-Based Filtering
 
-Files are matched by **basename only** (filename without path):
+The script only replaces screenshots defined in `config/screenshots.json`:
 
 ```
-Captured: output/screenshots/img/documentation/webapps/admin/admin-users.png
-Matches:  static/img/documentation/webapps/admin/admin-users.png
-          ↓
-Basename: admin-users.png
+output/screenshots/
+  img/documentation/webapps/admin/admin-users.png      <- Skipped (not in config)
+  img/documentation/webapps/welcome/welcome-dashboard-plugin.png  <- Replaced (in config)
 ```
 
-This allows the script to work even if the captured path structure differs slightly from the docs
-structure.
+This means you can:
 
-## Output
+- Have multiple captures from different scan runs in `output/screenshots/`
+- Only replace specific categories by copying the appropriate config
+- Safely re-run without accidentally replacing unwanted files
 
-### Console Output
+## Console Output
 
 ```
 ============================================================
@@ -92,142 +85,141 @@ structure.
 
 *** DRY RUN MODE - No files will be modified ***
 
-Configuration:
+Config: ./config/screenshots.json
+  2 screenshots defined
+
+Paths:
   Screenshots: ./output/screenshots
   Docs path:   C:/Users/mail/Development/documentation/docs
   Static path: C:/Users/mail/Development/documentation/static/img
 
 Building documentation image index...
-  Found 523 unique image names in documentation
-  Total locations: 891
+  Found 513 unique image names in documentation
+  Total locations: 532
 
 Processing captured screenshots...
   Source: ./output/screenshots
 
-  Found 28 captured screenshots
+  Found 30 captured screenshots
+  Matching config: 2
+  Skipped (not in config): 28
+
+  [DRY RUN] Would copy: img\documentation\webapps\welcome\welcome-dashboard-plugin.png
+            -> C:\Users\mail\Development\documentation\static\img\...\welcome-dashboard-plugin.png
 
 ============================================================
   Replace Screenshots Summary
 ============================================================
 
-  Screenshots found:    28
-  Replacements made:    28
+  In config:            2
+  Replacements made:    2
   Not in docs:          0
+  Skipped (not in cfg): 28
   Errors:               0
 
+  [DRY RUN MODE - no files were actually copied]
+
 ============================================================
+Report saved to: output\replace-report.md
 
-Report saved to: ./output/replace-report.md
+To actually replace screenshots, run:
+  make replace-screenshots-live
 ```
 
-### Generated Report
-
-Location: `output/replace-report.md`
-
-```markdown
-# Screenshot Replacement Report
-
-**Generated:** 2025-12-13T07:54:56.448Z
-
-**Mode:** DRY RUN
-
-## Summary
-
-- Screenshots processed: 28
-- Replacements made: 28
-- Not found in docs: 0
-- Errors: 0
-
-## Replaced Screenshots
-
-| Source                                          | Destination     | Location |
-| ----------------------------------------------- | --------------- | -------- |
-| img\documentation\webapps\admin\admin-users.png | admin-users.png | static   |
-| ...                                             | ...             | ...      |
-```
-
-## Exit Codes
-
-| Code | Description                                            |
-| ---- | ------------------------------------------------------ |
-| 0    | Success                                                |
-| 1    | Error (missing config, no screenshots directory, etc.) |
-
-## Workflow Integration
-
-This script is part of the screenshot automation workflow:
+## Workflow
 
 ```bash
-# 1. Scan documentation for image references
+# 1. Scan documentation
 make scan-docs
 
-# 2. Select a generated config
-cp config/generated/screenshots-admin.json config/screenshots.json
+# 2. Copy desired config
+cp output/scan/screenshots-welcome.json config/screenshots.json
 
-# 3. Set up environment (deploy processes, generate data)
-make deploy
-make data
+# 3. Set up environment
+make deploy && make data
 
 # 4. Capture screenshots
 make capture
 
-# 5. Preview what will be replaced
+# 5. Preview replacements (only config-defined screenshots)
 make replace-screenshots
 
-# 6. Actually replace (after reviewing)
+# 6. Apply replacements
 make replace-screenshots-live
 
-# 7. Commit changes in documentation repo
+# 7. Commit in documentation repo
 cd /path/to/documentation
-git add -A
-git commit -m "Update admin webapp screenshots"
+git add -A && git commit -m "Update welcome screenshots"
 ```
 
-## Report Locations Summary
+## Report Locations
 
-| Command                         | Report Location                   |
-| ------------------------------- | --------------------------------- |
-| `make scan-docs`                | `config/generated/scan-report.md` |
-| `make replace-screenshots`      | `output/replace-report.md`        |
-| `make replace-screenshots-live` | `output/replace-report.md`        |
+```
+Command                   Output Location
+------------------------- ---------------------------
+make scan-docs            output/scan/scan-report.md
+                          output/scan/screenshots-*.json
+
+make replace-screenshots  output/replace-report.md
+```
+
+## Safe Default Config
+
+The checked-in `config/screenshots.json` is empty by default:
+
+```json
+{
+  "version": "1.0.0",
+  "description": "Minimal screenshot config - copy from output/scan/ to replace",
+  "categories": {},
+  "screenshots": [],
+  "users": [],
+  "groups": []
+}
+```
+
+Running `make replace-screenshots-live` with this config does nothing - you must explicitly copy a
+generated config first.
 
 ## Troubleshooting
 
-### "Screenshots directory not found"
+### "No screenshots defined in config file"
 
-Run `make capture` first to capture screenshots.
-
-### "0 replacements made"
-
-- Check that `DOCS_PATH` and `STATIC_PATH` are correctly set in `.env`
-- Verify the documentation repository contains images with matching basenames
-- Run with `VERBOSE=true` to see which files aren't matching
-
-### Files not being replaced in live mode
-
-- Ensure `DRY_RUN=false` is set (or use `make replace-screenshots-live`)
-- Check file permissions in the documentation repository
-- Review the report for any errors
-
-### Multiple matches for same file
-
-If an image exists in both `docs/` and `static/img/`, it will be replaced in all locations. The
-report shows the "Location" column to indicate where each replacement was made.
-
-## Test Coverage
-
-The script is tested via the chaos test suite:
+Copy a generated config first:
 
 ```bash
-make chaos-capture
+cp output/scan/screenshots-admin.json config/screenshots.json
 ```
 
-Tests cover:
+### "No screenshots match the current config"
 
-- Configuration validation
-- Missing screenshots directory handling
-- Dry run mode
-- Report generation
+The captured screenshots don't match what's defined in `config/screenshots.json`. Either:
+
+- Re-capture with the correct config: `make capture`
+- Copy a different config that matches your captures
+
+### "0 replacements made" but screenshots exist
+
+- Check that `DOCS_PATH` and `STATIC_PATH` are correctly set
+- Verify screenshots exist with matching basenames in documentation
+- Run with `VERBOSE=true` to see details
+
+### Screenshot sizes don't match originals
+
+Update your `.env` to match original documentation screenshot dimensions:
+
+```bash
+SCREENSHOT_WIDTH=1200
+SCREENSHOT_HEIGHT=800
+SCREENSHOT_SCALE=1
+```
+
+Then re-capture:
+
+```bash
+rm -rf output/screenshots/*
+make capture
+```
 
 ## Future Enhancements
 
