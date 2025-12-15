@@ -19,6 +19,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Configuration - uses .env values with sensible defaults
 const config = {
+  // Screenshot config file - defines which screenshots to replace
+  configPath: process.env.CONFIG_PATH || path.join(__dirname, '..', 'config', 'screenshots.json'),
   // Source: where captured screenshots are stored
   screenshotsDir: process.env.OUTPUT_DIR || path.join(__dirname, '..', 'output', 'screenshots'),
   // Target: documentation repository paths
@@ -31,6 +33,9 @@ const config = {
   verbose: process.env.VERBOSE === 'true' || process.env.DEBUG === 'true',
 };
 
+// Loaded screenshot definitions
+let screenshotConfig = null;
+
 // Results tracking
 const results = {
   found: 0,
@@ -38,7 +43,59 @@ const results = {
   notFound: [],
   errors: [],
   copied: [],
+  skipped: [],
 };
+
+/**
+ * Load screenshot configuration
+ */
+async function loadScreenshotConfig() {
+  try {
+    const content = await fs.readFile(config.configPath, 'utf8');
+    screenshotConfig = JSON.parse(content);
+
+    if (!screenshotConfig.screenshots || screenshotConfig.screenshots.length === 0) {
+      console.log('! No screenshots defined in config file.');
+      console.log('  Copy a generated config first:');
+      console.log('  cp output/scan/screenshots-admin.json config/screenshots.json');
+      console.log('');
+      return false;
+    }
+
+    console.log(`Config: ${config.configPath}`);
+    console.log(`  ${screenshotConfig.screenshots.length} screenshots defined`);
+    console.log('');
+    return true;
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.error(`! Config file not found: ${config.configPath}`);
+    } else {
+      console.error(`! Error reading config: ${err.message}`);
+    }
+    return false;
+  }
+}
+
+/**
+ * Check if a screenshot file is defined in the config
+ */
+function isInConfig(screenshotPath) {
+  if (!screenshotConfig || !screenshotConfig.screenshots) {
+    return false;
+  }
+
+  const relativePath = path.relative(config.screenshotsDir, screenshotPath);
+  const normalizedPath = relativePath.replace(/\\/g, '/');
+
+  return screenshotConfig.screenshots.some(s => {
+    const configPath = s.outputFile.replace(/\\/g, '/');
+    return (
+      configPath === normalizedPath ||
+      configPath.endsWith(normalizedPath) ||
+      normalizedPath.endsWith(configPath)
+    );
+  });
+}
 
 /**
  * Find all files recursively in a directory
@@ -155,16 +212,30 @@ async function processScreenshots(docsIndex) {
   }
 
   // Find all captured screenshots
-  const screenshots = await findFiles(config.screenshotsDir);
-  results.found = screenshots.length;
+  const allScreenshots = await findFiles(config.screenshotsDir);
 
-  if (screenshots.length === 0) {
+  if (allScreenshots.length === 0) {
     console.log('  No screenshots found to process.');
     return;
   }
 
-  console.log(`  Found ${screenshots.length} captured screenshots`);
+  // Filter to only screenshots defined in config
+  const screenshots = allScreenshots.filter(s => isInConfig(s));
+  results.found = screenshots.length;
+  results.skipped = allScreenshots.filter(s => !isInConfig(s));
+
+  console.log(`  Found ${allScreenshots.length} captured screenshots`);
+  console.log(`  Matching config: ${screenshots.length}`);
+  if (results.skipped.length > 0) {
+    console.log(`  Skipped (not in config): ${results.skipped.length}`);
+  }
   console.log('');
+
+  if (screenshots.length === 0) {
+    console.log('  No screenshots match the current config.');
+    console.log('  Make sure config/screenshots.json matches your captured screenshots.');
+    return;
+  }
 
   // Process each screenshot
   for (const screenshotPath of screenshots) {
@@ -228,9 +299,10 @@ function printSummary() {
   console.log('  Replace Screenshots Summary');
   console.log('='.repeat(60));
   console.log('');
-  console.log(`  Screenshots found:    ${results.found}`);
+  console.log(`  In config:            ${results.found}`);
   console.log(`  Replacements made:    ${results.replaced}`);
   console.log(`  Not in docs:          ${results.notFound.length}`);
+  console.log(`  Skipped (not in cfg): ${results.skipped.length}`);
   console.log(`  Errors:               ${results.errors.length}`);
   console.log('');
 
@@ -327,7 +399,13 @@ async function main() {
     console.log('');
   }
 
-  console.log('Configuration:');
+  // Load screenshot config first
+  const configLoaded = await loadScreenshotConfig();
+  if (!configLoaded) {
+    process.exit(1);
+  }
+
+  console.log('Paths:');
   console.log(`  Screenshots: ${config.screenshotsDir}`);
   console.log(`  Docs path:   ${config.docsPath}`);
   console.log(`  Static path: ${config.staticPath}`);
@@ -353,9 +431,9 @@ async function main() {
     console.log('Next steps:');
     console.log('  1. Review changes in the documentation repository');
     console.log('  2. Commit and push the updated screenshots');
-  } else if (config.dryRun) {
-    console.log('To actually replace screenshots, run without DRY_RUN:');
-    console.log('  DRY_RUN=false make replace-screenshots');
+  } else if (config.dryRun && results.replaced > 0) {
+    console.log('To actually replace screenshots, run:');
+    console.log('  make replace-screenshots-live');
   }
 }
 
