@@ -13,7 +13,7 @@
 		reset-history data-debug incidents incidents-debug incidents-script incidents-service \
 		incidents-expression incidents-job simulate simulate-debug simulate-tokens simulate-history \
 		simulate-tasks capture-debug capture-visible chaos-capture chaos-capture-debug \
-		scan-docs scan-docs-path replace-screenshots replace-screenshots-live replace-screenshots-verbose \
+		scan-docs replace-screenshots replace-screenshots-live replace-screenshots-verbose \
 		screenshots-workflow
 
 # Default target
@@ -258,14 +258,18 @@ clean: ## Clean local output files (screenshots, reports)
 wipe: reset clean ## Full wipe: reset Operaton AND clean local files
 
 #---------------------------------------------------------------------------
-# DOCUMENTATION SCANNING & REPLACEMENT
-# These commands use values from .env file by default
-# Override with: make scan-docs DOCS_PATH=/custom/path
+# DOCUMENTATION SCANNING
+# Scans docs for screenshots, generates configs in output/scan/ (untracked)
 #---------------------------------------------------------------------------
 
-scan-docs: ## Scan documentation for image references and generate screenshot configs
+scan-docs: ## Scan documentation for screenshots (output: output/scan/)
 	@printf "$(CYAN)Scanning documentation for screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/scan-docs.js
+
+#---------------------------------------------------------------------------
+# SCREENSHOT REPLACEMENT
+# Replaces screenshots in documentation with captured ones
+#---------------------------------------------------------------------------
 
 replace-screenshots: ## Preview screenshot replacements (dry run)
 	@printf "$(CYAN)Previewing screenshot replacements (dry run)...$(RESET)\n"
@@ -288,18 +292,17 @@ replace-screenshots-verbose: ## Preview replacements with verbose output
 screenshots-workflow: ## Show full screenshot workflow instructions
 	@printf "$(CYAN)Screenshot Workflow$(RESET)\n"
 	@printf "$(CYAN)==================$(RESET)\n\n"
-	@printf "1. Configure .env with DOCS_PATH and STATIC_PATH\n"
-	@printf "   (copy .env.example to .env and edit)\n\n"
+	@printf "1. Configure .env with DOCS_PATH and STATIC_PATH\n\n"
 	@printf "2. Scan documentation:\n"
 	@printf "   make scan-docs\n\n"
-	@printf "3. Select a generated config:\n"
-	@printf "   cp config/generated/screenshots-cockpit.json config/screenshots.json\n"
-	@printf "   # Or: cp config/generated/screenshots-all.json config/screenshots.json\n\n"
-	@printf "4. Capture screenshots:\n"
+	@printf "3. Review output/scan/replacement-plan.md\n\n"
+	@printf "4. Copy a generated config:\n"
+	@printf "   cp output/scan/screenshots-admin.json config/screenshots.json\n\n"
+	@printf "5. Set up environment and capture:\n"
+	@printf "   make deploy && make data\n"
 	@printf "   make capture\n\n"
-	@printf "5. Preview replacements:\n"
-	@printf "   make replace-screenshots\n\n"
-	@printf "6. Apply replacements:\n"
+	@printf "6. Preview and apply replacements:\n"
+	@printf "   make replace-screenshots\n"
 	@printf "   make replace-screenshots-live\n\n"
 	@printf "7. Commit changes in documentation repo\n"
 

@@ -1,110 +1,66 @@
 # scan-docs.js
 
-Scan Operaton documentation for webapp screenshot references and generate capture configurations.
+Scan Operaton documentation for screenshots and generate capture configurations.
 
 ## Overview
 
-This script scans markdown files in the Operaton documentation repository to find image references,
-identifies which ones are webapp screenshots (Cockpit, Tasklist, Admin, Welcome), and generates JSON
-configuration files for the screenshot capture process.
+This unified script:
+
+1. Scans markdown files for all image references
+2. Identifies webapp screenshots (Cockpit, Tasklist, Admin, Welcome)
+3. Detects Camunda-branded images that need replacement
+4. Generates JSON capture configurations and reports
+
+All output goes to `output/scan/` (untracked), so you can re-scan without affecting tracked files.
 
 ## Usage
 
 ```bash
-# Scan documentation (uses DOCS_PATH from .env)
+# Scan documentation
 make scan-docs
 ```
 
 Or run directly:
 
 ```bash
-# Using .env configuration
 node scripts/scan-docs.js
-
-# With custom docs path
-DOCS_PATH=/path/to/documentation/docs node scripts/scan-docs.js
 ```
 
 ## Configuration
 
-All settings can be configured via `.env` file or environment variables:
-
-| Variable               | Description                            | Default              |
-| ---------------------- | -------------------------------------- | -------------------- |
-| `DOCS_PATH`            | Path to documentation `docs/` folder   | (required)           |
-| `GENERATED_CONFIG_DIR` | Output directory for generated configs | `./config/generated` |
-| `DEBUG`                | Enable debug output                    | `false`              |
-
-### Example .env Configuration
+Settings via `.env` file:
 
 ```bash
-# Path to Operaton documentation repository
+# Path to documentation docs/ folder (required)
 DOCS_PATH=C:/Users/username/Development/documentation/docs
 
-# Where to save generated configs
-GENERATED_CONFIG_DIR=./config/generated
+# Output directory for generated files (optional)
+SCAN_OUTPUT_DIR=./output/scan
+
+# Enable debug output
+DEBUG=false
 ```
 
-## How It Works
+## Output Files
 
-1. **Find Markdown Files**: Recursively scans `DOCS_PATH` for `.md` and `.mdx` files
-2. **Extract Image References**: Parses markdown and HTML image syntax
-3. **Categorize Images**: Identifies webapp screenshots based on:
-   - Source file location (e.g., `webapps/cockpit/`, `webapps/admin/`)
-   - Image filename prefix (e.g., `cockpit-`, `admin-`)
-4. **Infer URLs**: Determines webapp URLs from image filenames
-5. **Generate Configs**: Creates JSON configuration files per category
+All files are generated in `output/scan/`:
 
-### Categorization Logic
+```
+output/scan/
+  screenshots-cockpit.json   # Cockpit webapp config
+  screenshots-tasklist.json  # Tasklist webapp config
+  screenshots-admin.json     # Admin webapp config
+  screenshots-welcome.json   # Welcome webapp config
+  screenshots-all.json       # All webapps combined
+  scan-report.md             # Summary statistics
+  replacement-plan.md        # Camunda-branded images list
+```
 
-Only images that are **actual webapp screenshots** are included:
-
-| Criteria                          | Example                                          |
-| --------------------------------- | ------------------------------------------------ |
-| Source in `webapps/cockpit/` docs | `documentation/webapps/cockpit/dashboard.md`     |
-| Source in `webapps/admin/` docs   | `documentation/webapps/admin/user-management.md` |
-| Filename starts with `cockpit-`   | `cockpit-dashboard.png`                          |
-| Filename starts with `admin-`     | `admin-users.png`                                |
-
-Images that don't match (BPMN diagrams, modeler screenshots, etc.) are categorized as "other" and
-excluded from generated configs.
-
-### URL Inference
-
-The script infers webapp URLs from image filenames:
-
-| Pattern in Filename  | Inferred URL                                  |
-| -------------------- | --------------------------------------------- |
-| `dashboard`          | `#/dashboard`                                 |
-| `process-definition` | `#/process-definition/{processDefinitionKey}` |
-| `process-instance`   | `#/process-instance/{processInstanceId}`      |
-| `batch`              | `#/batch`                                     |
-| `users`              | `#/users`                                     |
-| `groups`             | `#/groups`                                    |
-| `tenants`            | `#/tenants`                                   |
-| `authorization`      | `#/authorization?resource=0`                  |
-| `system`             | `#/system`                                    |
-
-## Output
-
-### Generated Files
-
-Location: `config/generated/`
-
-| File                        | Description                     |
-| --------------------------- | ------------------------------- |
-| `screenshots-cockpit.json`  | Cockpit webapp screenshots      |
-| `screenshots-tasklist.json` | Tasklist webapp screenshots     |
-| `screenshots-admin.json`    | Admin webapp screenshots        |
-| `screenshots-welcome.json`  | Welcome webapp screenshots      |
-| `screenshots-all.json`      | All webapp screenshots combined |
-| `scan-report.md`            | Detailed scan report            |
-
-### Console Output
+## Console Output
 
 ```
 ============================================================
-  Documentation Screenshot Scanner v2
+  Documentation Screenshot Scanner
 ============================================================
 
 Docs path: C:/Users/mail/Development/documentation/docs
@@ -113,11 +69,14 @@ Finding markdown files...
   Found 413 markdown files
 
 Scanning for image references...
-  Found 541 image references
+  Total images: 541
   Webapp screenshots: 210
   Other images: 331
+  Camunda-branded: 15
+  Operaton-branded: 42
 
-Generating configuration files...
+Generating output files...
+Output directory: ./output/scan
 
   + screenshots-cockpit.json (155 screenshots)
   + screenshots-tasklist.json (25 screenshots)
@@ -125,8 +84,7 @@ Generating configuration files...
   + screenshots-welcome.json (2 screenshots)
   + screenshots-all.json (210 screenshots)
   + scan-report.md
-
-Output directory: ./config/generated
+  + replacement-plan.md
 
 ============================================================
   Scan Summary
@@ -134,112 +92,97 @@ Output directory: ./config/generated
 
 Webapp screenshots by category:
 
-  cockpit       155  #############################################################################
+  cockpit       155  #############################################
   tasklist       25  ############
   admin          28  ##############
   welcome         2  #
 
   Total webapp screenshots: 210
-  Other images (not captured): 331
+  Other images: 331
+
+Branding analysis:
+  Camunda-branded (need replacement): 15
+  Operaton-branded (already done): 42
 
 ============================================================
+
+Next steps:
+  1. Review output/scan/replacement-plan.md
+  2. Copy a config: cp output/scan/screenshots-admin.json config/screenshots.json
+  3. Capture: make capture
+  4. Replace: make replace-screenshots-live
 
 + Scan complete!
 ```
 
-### Generated JSON Structure
+## Workflow
+
+```bash
+# 1. Scan documentation
+make scan-docs
+
+# 2. Review the replacement plan
+cat output/scan/replacement-plan.md
+
+# 3. Copy desired config (admin, cockpit, tasklist, or all)
+cp output/scan/screenshots-admin.json config/screenshots.json
+
+# 4. Set up environment
+make deploy && make data
+
+# 5. Capture screenshots
+make capture
+
+# 6. Preview and apply replacements
+make replace-screenshots
+make replace-screenshots-live
+```
+
+## Report Locations
+
+```
+Command                   Output Location
+------------------------- ---------------------------
+make scan-docs            output/scan/scan-report.md
+                          output/scan/replacement-plan.md
+                          output/scan/screenshots-*.json
+
+make replace-screenshots  output/replace-report.md
+```
+
+## Safe Default Config
+
+The checked-in `config/screenshots.json` is an empty minimal config:
 
 ```json
 {
   "version": "1.0.0",
-  "description": "Admin webapp screenshots - generated from documentation",
-  "generatedAt": "2025-12-12T21:08:03.470Z",
-  "categories": {
-    "admin": {
-      "description": "Admin webapp screenshots",
-      "baseUrl": "/operaton/app/admin/default"
-    }
-  },
-  "screenshots": [
-    {
-      "id": "admin-users",
-      "category": "admin",
-      "description": "User management page",
-      "path": "#/users",
-      "outputFile": "img/documentation/webapps/admin/admin-users.png",
-      "sourceDoc": "documentation\\webapps\\admin\\user-management.md",
-      "sourceLine": 16,
-      "needsReview": false
-    }
-  ],
+  "description": "Minimal screenshot config - copy from output/scan/ to replace",
+  "categories": {},
+  "screenshots": [],
   "users": [],
   "groups": []
 }
 ```
 
-### Screenshot Entry Fields
-
-| Field         | Description                                         |
-| ------------- | --------------------------------------------------- |
-| `id`          | Unique identifier for the screenshot                |
-| `category`    | Webapp category (cockpit, tasklist, admin, welcome) |
-| `description` | Alt text from markdown or generated from filename   |
-| `path`        | Inferred URL path within the webapp                 |
-| `outputFile`  | Output path matching documentation structure        |
-| `sourceDoc`   | Markdown file where image is referenced             |
-| `sourceLine`  | Line number in source file                          |
-| `needsReview` | `true` if URL contains dynamic parameters           |
-
-## Workflow Integration
-
-```bash
-# 1. Configure .env with DOCS_PATH
-cp .env.example .env
-# Edit .env and set DOCS_PATH
-
-# 2. Scan documentation
-make scan-docs
-
-# 3. Review generated report
-cat config/generated/scan-report.md
-
-# 4. Select a config to use
-cp config/generated/screenshots-admin.json config/screenshots.json
-
-# 5. Capture screenshots
-make capture
-
-# 6. Replace in documentation
-make replace-screenshots-live
-```
-
-## Report Locations Summary
-
-| Command                    | Report Location                   |
-| -------------------------- | --------------------------------- |
-| `make scan-docs`           | `config/generated/scan-report.md` |
-| `make replace-screenshots` | `output/replace-report.md`        |
+This ensures `make capture` and `make replace-screenshots-live` won't accidentally modify anything
+until you explicitly copy a generated config.
 
 ## Troubleshooting
 
 ### "Documentation path not found"
 
-Set `DOCS_PATH` in your `.env` file:
+Set `DOCS_PATH` in your `.env` file pointing to the docs folder.
 
-```bash
-DOCS_PATH=C:/Users/username/Development/documentation/docs
-```
+### No webapp screenshots found
 
-### "0 webapp screenshots found"
+- Check documentation has `webapps/` folder structure
+- Verify image filenames follow conventions (`cockpit-*.png`, `admin-*.png`)
 
-- Check that the documentation has a `webapps/` folder structure
-- Verify image filenames follow naming conventions (e.g., `cockpit-*.png`, `admin-*.png`)
-- Run with `DEBUG=true` for more details
+### Screenshots marked as needsReview
 
-### Screenshots marked as `needsReview: true`
-
-These screenshots have URLs with dynamic parameters like `{processDefinitionKey}`. The capture
-script will attempt to resolve these using live data from the Operaton instance.
+These have dynamic URL parameters like `{processDefinitionKey}`. The capture script resolves them
+using live data from Operaton.
 
 ## Future Enhancements
 

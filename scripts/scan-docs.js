@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  * Copyright 2025 Operaton
  *
- * Scan Documentation for Screenshot References (v2)
+ * Scan Documentation for Screenshots
  *
- * Improved version that:
- * 1. Focuses on actual webapp screenshots (from webapps docs)
- * 2. Better categorization based on file path, not keywords
- * 3. Smarter URL inference from image filenames
- * 4. Separates webapp screenshots from other images
+ * Unified script that:
+ * 1. Scans documentation for all image references
+ * 2. Identifies webapp screenshots (cockpit, tasklist, admin, welcome)
+ * 3. Detects Camunda-branded images that need replacement
+ * 4. Generates capture configurations and reports
+ *
+ * All output goes to output/scan/ (untracked)
  */
 
 import 'dotenv/config';
@@ -23,10 +25,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Configuration
 const config = {
   docsPath: process.env.DOCS_PATH || path.join(__dirname, '..', '..', 'documentation', 'docs'),
-  outputDir: process.env.GENERATED_CONFIG_DIR || path.join(__dirname, '..', 'config', 'generated'),
+  staticPath:
+    process.env.STATIC_PATH || path.join(__dirname, '..', '..', 'documentation', 'static', 'img'),
+  outputDir: process.env.SCAN_OUTPUT_DIR || path.join(__dirname, '..', 'output', 'scan'),
   debug: process.env.DEBUG === 'true',
   imageExtensions: ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'],
 };
+
+// Patterns that indicate Camunda branding (need replacement)
+const camundaPatterns = [/camunda/i, /cawemo/i];
 
 // Results storage
 const results = {
@@ -39,18 +46,40 @@ const results = {
     welcome: [],
   },
   otherImages: [],
-  byDocSection: {},
+  camundaBranded: [],
+  alreadyOperaton: [],
+  statistics: {
+    byCategory: {},
+    byDocSection: {},
+    needsReplacement: 0,
+    alreadyReplaced: 0,
+  },
 };
 
 /**
+ * Check if image appears to be Camunda-branded
+ */
+function isCamundaBranded(imagePath, alt = '') {
+  const searchText = `${imagePath} ${alt}`.toLowerCase();
+  return camundaPatterns.some(pattern => pattern.test(searchText));
+}
+
+/**
+ * Check if image appears to be Operaton-branded
+ */
+function isOperatonBranded(imagePath, alt = '') {
+  const searchText = `${imagePath} ${alt}`.toLowerCase();
+  return /operaton/i.test(searchText);
+}
+
+/**
  * Determine webapp category from image path
- * Only categorizes images that are actual webapp screenshots
  */
 function getWebappCategory(imagePath, sourceFile) {
   const imgLower = imagePath.toLowerCase();
   const srcLower = sourceFile.toLowerCase();
 
-  // Method 1: Check if image is in webapps documentation section
+  // Check if image is in webapps documentation section
   if (srcLower.includes('webapps/cockpit') || imgLower.includes('webapps/cockpit')) {
     return 'cockpit';
   }
@@ -64,7 +93,7 @@ function getWebappCategory(imagePath, sourceFile) {
     return 'welcome';
   }
 
-  // Method 2: Check image filename prefixes (common naming convention)
+  // Check image filename prefixes
   const basename = path.basename(imgLower);
   if (basename.startsWith('cockpit-') || basename.startsWith('cockpit_')) {
     return 'cockpit';
@@ -79,7 +108,6 @@ function getWebappCategory(imagePath, sourceFile) {
     return 'welcome';
   }
 
-  // Not a webapp screenshot
   return null;
 }
 
@@ -89,10 +117,7 @@ function getWebappCategory(imagePath, sourceFile) {
 function inferCockpitUrl(imagePath) {
   const img = imagePath.toLowerCase();
 
-  // Dashboard
   if (img.includes('dashboard')) return '#/dashboard';
-
-  // Process views
   if (img.includes('process-definition') || img.includes('process_definition')) {
     return '#/process-definition/{processDefinitionKey}';
   }
@@ -100,8 +125,6 @@ function inferCockpitUrl(imagePath) {
     return '#/process-instance/{processInstanceId}';
   }
   if (img.includes('processes')) return '#/processes';
-
-  // Decision views
   if (img.includes('decision-definition') || img.includes('decision_definition')) {
     return '#/decision-definition/{decisionDefinitionKey}';
   }
@@ -109,8 +132,6 @@ function inferCockpitUrl(imagePath) {
     return '#/decision-instance/{decisionInstanceId}';
   }
   if (img.includes('decision')) return '#/decisions';
-
-  // Case views
   if (img.includes('case-definition') || img.includes('case_definition')) {
     return '#/case-definition/{caseDefinitionKey}';
   }
@@ -118,8 +139,6 @@ function inferCockpitUrl(imagePath) {
     return '#/case-instance/{caseInstanceId}';
   }
   if (img.includes('case')) return '#/cases';
-
-  // Other views
   if (img.includes('deployment') || img.includes('repository')) return '#/repository';
   if (img.includes('batch')) return '#/batch';
   if (img.includes('migration')) return '#/migration';
@@ -194,15 +213,13 @@ function extractImageReferences(content, filePath) {
 
   while ((match = mdImageRegex.exec(content)) !== null) {
     const alt = match[1];
-    const imagePath = match[2].split(' ')[0].split('#')[0]; // Remove title and anchors
+    const imagePath = match[2].split(' ')[0].split('#')[0];
     const lineNumber = content.substring(0, match.index).split('\n').length;
 
-    // Skip external URLs
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       continue;
     }
 
-    // Check if it's an image file
     const ext = path.extname(imagePath).toLowerCase();
     if (!config.imageExtensions.includes(ext)) {
       continue;
@@ -288,7 +305,6 @@ function generateScreenshotId(category, imagePath) {
     .replace(/^-|-$/g, '')
     .toLowerCase();
 
-  // Avoid duplicate prefix
   if (cleanName.startsWith(category)) {
     return cleanName;
   }
@@ -300,7 +316,7 @@ function generateScreenshotId(category, imagePath) {
  */
 async function scanDocumentation() {
   console.log('='.repeat(60));
-  console.log('  Documentation Screenshot Scanner v2');
+  console.log('  Documentation Screenshot Scanner');
   console.log('='.repeat(60));
   console.log('');
   console.log(`Docs path: ${config.docsPath}`);
@@ -311,7 +327,7 @@ async function scanDocumentation() {
   } catch {
     console.error(`! Documentation path not found: ${config.docsPath}`);
     console.error('');
-    console.error('Set DOCS_PATH in your .env file or as environment variable.');
+    console.error('Set DOCS_PATH in your .env file.');
     process.exit(1);
   }
 
@@ -330,25 +346,33 @@ async function scanDocumentation() {
       for (const image of images) {
         results.totalImages++;
 
-        // Determine if it's a webapp screenshot
+        // Check branding
+        const isCamunda = isCamundaBranded(image.path, image.alt);
+        const isOperaton = isOperatonBranded(image.path, image.alt);
+
+        if (isCamunda) {
+          results.camundaBranded.push(image);
+          results.statistics.needsReplacement++;
+        } else if (isOperaton) {
+          results.alreadyOperaton.push(image);
+          results.statistics.alreadyReplaced++;
+        }
+
+        // Determine category
         const category = getWebappCategory(image.path, image.sourceFile);
 
         if (category) {
           results.webappScreenshots[category].push(image);
+          results.statistics.byCategory[category] =
+            (results.statistics.byCategory[category] || 0) + 1;
         } else {
           results.otherImages.push(image);
         }
 
         // Track by doc section
         const section = image.sourceFile.split(/[\\/]/).slice(0, 2).join('/');
-        if (!results.byDocSection[section]) {
-          results.byDocSection[section] = { webapp: 0, other: 0 };
-        }
-        if (category) {
-          results.byDocSection[section].webapp++;
-        } else {
-          results.byDocSection[section].other++;
-        }
+        results.statistics.byDocSection[section] =
+          (results.statistics.byDocSection[section] || 0) + 1;
       }
     } catch {
       // Skip
@@ -359,9 +383,11 @@ async function scanDocumentation() {
     (sum, arr) => sum + arr.length,
     0
   );
-  console.log(`  Found ${results.totalImages} image references`);
+  console.log(`  Total images: ${results.totalImages}`);
   console.log(`  Webapp screenshots: ${webappTotal}`);
   console.log(`  Other images: ${results.otherImages.length}`);
+  console.log(`  Camunda-branded: ${results.camundaBranded.length}`);
+  console.log(`  Operaton-branded: ${results.alreadyOperaton.length}`);
   console.log('');
 }
 
@@ -380,13 +406,11 @@ function generateCategoryConfig(category, images) {
   const seenOutputFiles = new Set();
 
   for (const image of images) {
-    // Normalize output file path
     let outputFile = image.path;
     if (outputFile.startsWith('/')) {
       outputFile = outputFile.substring(1);
     }
 
-    // Skip duplicates
     if (seenOutputFiles.has(outputFile)) {
       continue;
     }
@@ -409,7 +433,7 @@ function generateCategoryConfig(category, images) {
 
   return {
     version: '1.0.0',
-    description: `${category.charAt(0).toUpperCase() + category.slice(1)} webapp screenshots - generated from documentation`,
+    description: `${category.charAt(0).toUpperCase() + category.slice(1)} webapp screenshots`,
     generatedAt: new Date().toISOString(),
     categories: {
       [category]: {
@@ -475,7 +499,7 @@ function generateCombinedConfig() {
 
   return {
     version: '1.0.0',
-    description: 'All webapp screenshots - generated from documentation',
+    description: 'All webapp screenshots',
     generatedAt: new Date().toISOString(),
     categories,
     screenshots: allScreenshots,
@@ -485,44 +509,9 @@ function generateCombinedConfig() {
 }
 
 /**
- * Write config files
+ * Generate scan report
  */
-async function writeConfigs() {
-  await fs.mkdir(config.outputDir, { recursive: true });
-
-  console.log('Generating configuration files...');
-  console.log('');
-
-  for (const [category, images] of Object.entries(results.webappScreenshots)) {
-    if (images.length === 0) continue;
-
-    const categoryConfig = generateCategoryConfig(category, images);
-    const outputPath = path.join(config.outputDir, `screenshots-${category}.json`);
-
-    await fs.writeFile(outputPath, JSON.stringify(categoryConfig, null, 2));
-    console.log(
-      `  + screenshots-${category}.json (${categoryConfig.screenshots.length} screenshots)`
-    );
-  }
-
-  const combinedConfig = generateCombinedConfig();
-  const combinedPath = path.join(config.outputDir, 'screenshots-all.json');
-  await fs.writeFile(combinedPath, JSON.stringify(combinedConfig, null, 2));
-  console.log(`  + screenshots-all.json (${combinedConfig.screenshots.length} screenshots)`);
-
-  // Write report
-  const reportPath = path.join(config.outputDir, 'scan-report.md');
-  await fs.writeFile(reportPath, generateReport());
-  console.log(`  + scan-report.md`);
-
-  console.log('');
-  console.log(`Output directory: ${config.outputDir}`);
-}
-
-/**
- * Generate markdown report
- */
-function generateReport() {
+function generateScanReport() {
   const webappTotal = Object.values(results.webappScreenshots).reduce(
     (sum, arr) => sum + arr.length,
     0
@@ -535,49 +524,139 @@ function generateReport() {
   md += '## Summary\n\n';
   md += `- Markdown files scanned: ${results.totalFiles}\n`;
   md += `- Total image references: ${results.totalImages}\n`;
-  md += `- **Webapp screenshots: ${webappTotal}**\n`;
+  md += `- Webapp screenshots: ${webappTotal}\n`;
   md += `- Other images: ${results.otherImages.length}\n\n`;
 
+  md += '## Branding Analysis\n\n';
+  md += `- Camunda-branded (need replacement): ${results.camundaBranded.length}\n`;
+  md += `- Operaton-branded (already updated): ${results.alreadyOperaton.length}\n`;
+  md += `- Neutral (no branding detected): ${results.totalImages - results.camundaBranded.length - results.alreadyOperaton.length}\n\n`;
+
   md += '## Webapp Screenshots by Category\n\n';
-  md += '| Category | Count |\n';
-  md += '|----------|-------|\n';
-
+  md += '```\n';
+  md += 'Category     Count\n';
+  md += '------------ -----\n';
   for (const [category, images] of Object.entries(results.webappScreenshots)) {
-    md += `| ${category} | ${images.length} |\n`;
+    md += `${category.padEnd(12)} ${images.length}\n`;
   }
-  md += `| **Total** | **${webappTotal}** |\n`;
+  md += `${'TOTAL'.padEnd(12)} ${webappTotal}\n`;
+  md += '```\n\n';
 
-  md += '\n## Generated Config Files\n\n';
-  md += '| File | Description | Screenshots |\n';
-  md += '|------|-------------|-------------|\n';
-
+  md += '## Generated Files\n\n';
+  md += '```\n';
+  md += 'File                          Screenshots\n';
+  md += '----------------------------- -----------\n';
   for (const [category, images] of Object.entries(results.webappScreenshots)) {
     if (images.length === 0) continue;
-    md += `| screenshots-${category}.json | ${category} webapp | ${images.length} |\n`;
+    md += `${`screenshots-${category}.json`.padEnd(30)}${images.length}\n`;
   }
-  md += `| screenshots-all.json | All webapps | ${webappTotal} |\n`;
+  md += `${`screenshots-all.json`.padEnd(30)}${webappTotal}\n`;
+  md += '```\n\n';
 
-  md += '\n## Usage\n\n';
+  md += '## Usage\n\n';
   md += '```bash\n';
-  md += '# Copy desired config\n';
-  md += 'cp config/generated/screenshots-cockpit.json config/screenshots.json\n';
+  md += '# Copy desired config to config/screenshots.json\n';
+  md += 'cp output/scan/screenshots-admin.json config/screenshots.json\n';
   md += '\n';
   md += '# Or use all\n';
-  md += 'cp config/generated/screenshots-all.json config/screenshots.json\n';
+  md += 'cp output/scan/screenshots-all.json config/screenshots.json\n';
   md += '\n';
-  md += '# Capture screenshots\n';
+  md += '# Then capture and replace\n';
   md += 'make capture\n';
-  md += '\n';
-  md += '# Replace in docs\n';
   md += 'make replace-screenshots-live\n';
   md += '```\n';
 
-  md += '\n## Notes\n\n';
-  md += '- Only images from `webapps/` documentation sections are included\n';
-  md += '- Screenshots with `needsReview: true` have dynamic URL parameters\n';
-  md += '- Duplicate images (same output path) are automatically deduplicated\n';
+  return md;
+}
+
+/**
+ * Generate replacement plan (Camunda -> Operaton analysis)
+ */
+function generateReplacementPlan() {
+  let md = '# Screenshot Replacement Plan\n\n';
+  md += `**Generated:** ${new Date().toISOString()}\n\n`;
+
+  md += '## Overview\n\n';
+  md += `This document identifies screenshots that need to be replaced with Operaton versions.\n\n`;
+
+  md += '## Statistics\n\n';
+  md += `- Total images scanned: ${results.totalImages}\n`;
+  md += `- Camunda-branded (ACTION NEEDED): ${results.camundaBranded.length}\n`;
+  md += `- Operaton-branded (already done): ${results.alreadyOperaton.length}\n`;
+  md += `- Neutral/other: ${results.totalImages - results.camundaBranded.length - results.alreadyOperaton.length}\n\n`;
+
+  if (results.camundaBranded.length > 0) {
+    md += '## Camunda-Branded Images (Need Replacement)\n\n';
+
+    // Group by source file
+    const byFile = {};
+    for (const img of results.camundaBranded) {
+      if (!byFile[img.sourceFile]) {
+        byFile[img.sourceFile] = [];
+      }
+      byFile[img.sourceFile].push(img);
+    }
+
+    for (const [file, images] of Object.entries(byFile).sort()) {
+      md += `### ${file}\n\n`;
+      for (const img of images) {
+        md += `- Line ${img.lineNumber}: \`${path.basename(img.path)}\`\n`;
+      }
+      md += '\n';
+    }
+  } else {
+    md += '## Status: No Camunda-branded images found!\n\n';
+    md += 'All screenshots appear to be either Operaton-branded or neutral.\n';
+  }
+
+  if (results.alreadyOperaton.length > 0) {
+    md += '## Already Operaton-Branded (No Action Needed)\n\n';
+    md += `${results.alreadyOperaton.length} images already contain Operaton branding.\n\n`;
+  }
 
   return md;
+}
+
+/**
+ * Write all output files
+ */
+async function writeOutputs() {
+  await fs.mkdir(config.outputDir, { recursive: true });
+
+  console.log('Generating output files...');
+  console.log(`Output directory: ${config.outputDir}`);
+  console.log('');
+
+  // Write per-category configs
+  for (const [category, images] of Object.entries(results.webappScreenshots)) {
+    if (images.length === 0) continue;
+
+    const categoryConfig = generateCategoryConfig(category, images);
+    const outputPath = path.join(config.outputDir, `screenshots-${category}.json`);
+
+    await fs.writeFile(outputPath, JSON.stringify(categoryConfig, null, 2));
+    console.log(
+      `  + screenshots-${category}.json (${categoryConfig.screenshots.length} screenshots)`
+    );
+  }
+
+  // Write combined config
+  const combinedConfig = generateCombinedConfig();
+  const combinedPath = path.join(config.outputDir, 'screenshots-all.json');
+  await fs.writeFile(combinedPath, JSON.stringify(combinedConfig, null, 2));
+  console.log(`  + screenshots-all.json (${combinedConfig.screenshots.length} screenshots)`);
+
+  // Write scan report
+  const scanReportPath = path.join(config.outputDir, 'scan-report.md');
+  await fs.writeFile(scanReportPath, generateScanReport());
+  console.log(`  + scan-report.md`);
+
+  // Write replacement plan
+  const replacementPlanPath = path.join(config.outputDir, 'replacement-plan.md');
+  await fs.writeFile(replacementPlanPath, generateReplacementPlan());
+  console.log(`  + replacement-plan.md`);
+
+  console.log('');
 }
 
 /**
@@ -589,7 +668,6 @@ function printSummary() {
     0
   );
 
-  console.log('');
   console.log('='.repeat(60));
   console.log('  Scan Summary');
   console.log('='.repeat(60));
@@ -604,9 +682,19 @@ function printSummary() {
 
   console.log('');
   console.log(`  Total webapp screenshots: ${webappTotal}`);
-  console.log(`  Other images (not captured): ${results.otherImages.length}`);
+  console.log(`  Other images: ${results.otherImages.length}`);
+  console.log('');
+  console.log('Branding analysis:');
+  console.log(`  Camunda-branded (need replacement): ${results.camundaBranded.length}`);
+  console.log(`  Operaton-branded (already done): ${results.alreadyOperaton.length}`);
   console.log('');
   console.log('='.repeat(60));
+  console.log('');
+  console.log('Next steps:');
+  console.log('  1. Review output/scan/replacement-plan.md');
+  console.log('  2. Copy a config: cp output/scan/screenshots-admin.json config/screenshots.json');
+  console.log('  3. Capture: make capture');
+  console.log('  4. Replace: make replace-screenshots-live');
 }
 
 /**
@@ -614,7 +702,7 @@ function printSummary() {
  */
 async function main() {
   await scanDocumentation();
-  await writeConfigs();
+  await writeOutputs();
   printSummary();
 
   console.log('');
@@ -624,5 +712,8 @@ async function main() {
 
 main().catch(err => {
   console.error('Unexpected error:', err.message);
+  if (config.debug) {
+    console.error(err.stack);
+  }
   process.exit(1);
 });
