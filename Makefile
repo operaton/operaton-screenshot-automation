@@ -12,7 +12,9 @@
 		chaos-simulate chaos-simulate-debug status-debug analyze-debug deploy-debug  reset-debug \
 		reset-history data-debug incidents incidents-debug incidents-script incidents-service \
 		incidents-expression incidents-job simulate simulate-debug simulate-tokens simulate-history \
-		simulate-tasks 
+		simulate-tasks capture-debug capture-visible chaos-capture chaos-capture-debug \
+		scan-docs replace-screenshots replace-screenshots-live replace-screenshots-verbose \
+		screenshots-workflow
 
 # Default target
 .DEFAULT_GOAL := help
@@ -58,8 +60,14 @@ help: ## Show this help message
 	@printf "$(GREEN)Deployment & Data:$(RESET)\n"
 	@grep -E '^(deploy|data|users|incidents|simulate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@printf "\n"
+	@printf "$(GREEN)Scan Documentation:$(RESET)\n"
+	@grep -E '^(scan-docs):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
 	@printf "$(GREEN)Screenshot Capture:$(RESET)\n"
-	@grep -E '^(capture|analyze):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(capture):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+	@printf "$(GREEN)Replace Screenshots:$(RESET)\n"
+	@grep -E '^(replace-screenshots|replace-screenshots-live):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@printf "\n"
 	@printf "$(GREEN)Code Quality:$(RESET)\n"
 	@grep -E '^(lint|format|validate):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -190,37 +198,17 @@ incidents-job: ## Create only job/external task incidents
 # SCREENSHOT CAPTURE
 #---------------------------------------------------------------------------
 
-capture: ## Capture all screenshots (headless)
+capture: ## Capture screenshots from Operaton webapps
 	@printf "$(CYAN)Capturing screenshots...$(RESET)\n"
 	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
-capture-debug: ## Capture screenshots with visible browser (for debugging)
+capture-debug: ## Capture screenshots with debug output
 	@printf "$(CYAN)Capturing screenshots (debug mode)...$(RESET)\n"
-	HEADLESS=false DEBUG=true $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
+	DEBUG=true $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
-capture-cockpit: ## Capture only Cockpit screenshots
-	@printf "$(CYAN)Capturing Cockpit screenshots...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=cockpit
-
-capture-tasklist: ## Capture only Tasklist screenshots
-	@printf "$(CYAN)Capturing Tasklist screenshots...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=tasklist
-
-capture-admin: ## Capture only Admin screenshots
-	@printf "$(CYAN)Capturing Admin screenshots...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/capture-screenshots.js --category=admin
-
-analyze: ## Analyze documentation for screenshots to replace 
-	@printf "$(CYAN)Analyzing documentation...$(RESET)\n"
-	$(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
-
-analyze-debug: ## Analyze documentation for screenshots to replace with debug output 
-	@printf "$(CYAN)Analyzing documentation (debug mode)...$(RESET)\n"
-	DEBUG=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
-
-analyze-all: ## Analyze documentation (flag ALL images for replacement) 
-	@printf "$(CYAN)Analyzing documentation (replace all mode)...$(RESET)\n"
-	REPLACE_ALL=true $(NODE) $(SCRIPTS_DIR)/analyze-documentation.js
+capture-visible: ## Capture screenshots with visible browser (not headless)
+	@printf "$(CYAN)Capturing screenshots (visible browser)...$(RESET)\n"
+	HEADLESS=false $(NODE) $(SCRIPTS_DIR)/capture-screenshots.js
 
 #---------------------------------------------------------------------------
 # CLEANUP & RESET
@@ -264,6 +252,57 @@ clean: ## Clean local output files (screenshots, reports)
 wipe: reset clean ## Full wipe: reset Operaton AND clean local files
 
 #---------------------------------------------------------------------------
+# DOCUMENTATION SCANNING
+# Scans docs for screenshots, generates configs in output/scan/ (untracked)
+#---------------------------------------------------------------------------
+
+scan-docs: ## Scan documentation for screenshots (output: output/scan/)
+	@printf "$(CYAN)Scanning documentation for screenshots...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/scan-docs.js
+
+
+#---------------------------------------------------------------------------
+# SCREENSHOT REPLACEMENT
+# Replaces screenshots in documentation with captured ones
+#---------------------------------------------------------------------------
+
+replace-screenshots: ## Preview screenshot replacements (dry run)
+	@printf "$(CYAN)Previewing screenshot replacements (dry run)...$(RESET)\n"
+	$(NODE) $(SCRIPTS_DIR)/replace-screenshots.js
+
+replace-screenshots-live: ## Actually replace screenshots in documentation
+	@printf "$(YELLOW)Replacing screenshots (LIVE - files will be modified)...$(RESET)\n"
+	@printf "$(YELLOW)Press Ctrl+C within 3 seconds to cancel...$(RESET)\n"
+	@sleep 3
+	DRY_RUN=false $(NODE) $(SCRIPTS_DIR)/replace-screenshots.js
+
+replace-screenshots-verbose: ## Preview replacements with verbose output
+	@printf "$(CYAN)Previewing screenshot replacements (verbose)...$(RESET)\n"
+	VERBOSE=true $(NODE) $(SCRIPTS_DIR)/replace-screenshots.js
+
+
+#---------------------------------------------------------------------------
+# WORKFLOW SHORTCUTS
+#---------------------------------------------------------------------------
+
+screenshots-workflow: ## Show full screenshot workflow instructions
+	@printf "$(CYAN)Screenshot Workflow$(RESET)\n"
+	@printf "$(CYAN)==================$(RESET)\n\n"
+	@printf "1. Configure .env with DOCS_PATH and STATIC_PATH\n\n"
+	@printf "2. Scan documentation:\n"
+	@printf "   make scan-docs\n\n"
+	@printf "3. Review output/scan/scan-report.md\n\n"
+	@printf "4. Copy a generated config:\n"
+	@printf "   cp output/scan/screenshots-admin.json config/screenshots.json\n\n"
+	@printf "5. Set up environment and capture:\n"
+	@printf "   make deploy && make data\n"
+	@printf "   make capture\n\n"
+	@printf "6. Preview and apply replacements:\n"
+	@printf "   make replace-screenshots\n"
+	@printf "   make replace-screenshots-live\n\n"
+	@printf "7. Commit changes in documentation repo\n"
+
+#---------------------------------------------------------------------------
 # WORKFLOWS (Combined Tasks)
 #---------------------------------------------------------------------------
 
@@ -293,7 +332,16 @@ test: ## Run all tests
 	$(NODE) tests/chaos-generate-data.js
 	$(NODE) tests/chaos-create-incidents.js
 	$(NODE) tests/chaos-simulate-scenarios.js
+	$(NODE) tests/chaos-capture-screenshots.js
 	@printf "$(GREEN)✓ All tests passed$(RESET)\n"
+
+chaos-capture: ## Run chaos tests for capture-screenshots
+	@printf "$(CYAN)Running chaos tests for capture-screenshots...$(RESET)\n"
+	$(NODE) tests/chaos-capture-screenshots.js
+
+chaos-capture-debug:  # Hidden - use DEBUG=true make chaos-capture
+	@printf "$(CYAN)Running chaos tests for capture-screenshots (debug mode)...$(RESET)\n"
+	DEBUG=true $(NODE) tests/chaos-capture-screenshots.js
 
 chaos-check: ## Run chaos tests for check-connection
 	@printf "$(CYAN)Running chaos tests for check-connection...$(RESET)\n"
