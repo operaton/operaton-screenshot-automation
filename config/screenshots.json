@@ -1,35 +1,8 @@
 {
   "version": "1.0.0",
-  "description": "Welcome webapp screenshots",
-  "generatedAt": "2025-12-15T08:07:36.599Z",
-  "categories": {
-    "welcome": {
-      "description": "Welcome webapp screenshots",
-      "baseUrl": "/operaton/app/welcome/default"
-    }
-  },
-  "screenshots": [
-    {
-      "id": "welcome-dashboard-plugin",
-      "category": "welcome",
-      "description": "Example img",
-      "path": "#/welcome",
-      "outputFile": "img/documentation/webapps/welcome/welcome-dashboard-plugin.png",
-      "sourceDoc": "documentation\\webapps\\welcome\\welcome-plugins.md",
-      "sourceLine": 21,
-      "needsReview": false
-    },
-    {
-      "id": "welcome-profile-plugin",
-      "category": "welcome",
-      "description": "Example img",
-      "path": "#/welcome",
-      "outputFile": "img/documentation/webapps/welcome/welcome-profile-plugin.png",
-      "sourceDoc": "documentation\\webapps\\welcome\\welcome-plugins.md",
-      "sourceLine": 25,
-      "needsReview": false
-    }
-  ],
+  "description": "Minimal screenshot config - copy from output/scan/ to replace",
+  "categories": {},
+  "screenshots": [],
   "users": [],
   "groups": []
 }
