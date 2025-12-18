@@ -21,8 +21,9 @@ import { fileURLToPath } from 'url';
 import axios from 'axios';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, '../config/screenshots.json');
-const OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(__dirname, '../output/screenshots');
+const CONFIG_PATH =
+  process.env.CONFIG_PATH || path.join(__dirname, '..', 'config', 'screenshots.json');
+const OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(__dirname, '..', 'output', 'screenshots');
 
 // Configuration
 const config = {
@@ -46,7 +47,25 @@ const api = axios.create({
     username: config.username,
     password: config.password,
   },
+  timeout: 30000,
 });
+
+/**
+ * Delay helper
+ * @param {number} ms - Milliseconds to delay
+ * @returns {Promise<void>}
+ */
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Log debug information
+ * @param {string} message - Debug message
+ */
+function debug(message) {
+  if (config.debug) {
+    console.log(`    [DEBUG] ${message}`);
+  }
+}
 
 /**
  * Get dynamic data needed for screenshots
@@ -71,7 +90,7 @@ async function getDynamicData() {
     const decisions = await api.get('/history/decision-instance', { params: { maxResults: 10 } });
     data.decisionInstances = decisions.data;
   } catch (error) {
-    console.warn('Warning: Could not fetch dynamic data:', error.message);
+    console.warn('  ! Could not fetch dynamic data:', error.message);
   }
 
   return data;
@@ -83,57 +102,96 @@ async function getDynamicData() {
 async function login(page, app = 'cockpit') {
   const loginUrl = `${config.baseUrl}/operaton/app/${app}/default/`;
 
-  console.log(`  Navigating to: ${loginUrl}`);
+  debug(`Login URL: ${loginUrl}`);
   await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
-  // Wait for login form or check if already logged in
-  try {
-    // Check if we're on the login page
-    const loginForm = await page.$('form[name="login"]');
-    if (loginForm) {
-      console.log('  Logging in...');
+  // Wait for page to stabilize
+  await delay(1000);
 
-      // Fill in credentials
-      await page.type('input[name="username"]', config.username);
-      await page.type('input[name="password"]', config.password);
+  // Check if we're on the login page by looking for username input
+  try {
+    const usernameInput = await page.$(
+      'input[name="username"], input#username, input[placeholder="Username"]'
+    );
+
+    if (usernameInput) {
+      console.log(`  Logging in as ${config.username}...`);
+
+      // Clear and fill username
+      await usernameInput.click({ clickCount: 3 });
+      await usernameInput.type(config.username);
+
+      // Fill password
+      const passwordInput = await page.$(
+        'input[name="password"], input#password, input[type="password"]'
+      );
+      if (passwordInput) {
+        await passwordInput.click({ clickCount: 3 });
+        await passwordInput.type(config.password);
+      }
 
       // Submit form
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
-        page.click('button[type="submit"]'),
-      ]);
+      const submitButton = await page.$(
+        'button[type="submit"], button.btn-primary, input[type="submit"]'
+      );
+      if (submitButton) {
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {
+            /* empty */
+          }),
+          submitButton.click(),
+        ]);
+      }
 
-      console.log('  ✓ Logged in successfully');
+      // Wait for app to load after login
+      await delay(2000);
+
+      // Verify login succeeded
+      const stillOnLogin = await page.$('input[name="username"], input[placeholder="Username"]');
+      if (stillOnLogin) {
+        console.log('  ! Login may have failed - still on login page');
+      } else {
+        console.log('  + Logged in successfully');
+      }
     } else {
-      console.log('  ✓ Already logged in');
+      // Check if we're actually logged in by looking for app content
+      const appContent = await page.$(
+        '.navbar, .cam-header, [ng-view], .content-wrapper, .ctn-header'
+      );
+      if (appContent) {
+        console.log('  + Already logged in');
+      } else {
+        console.log('  ! Could not detect login state');
+        debug(`Page URL: ${page.url()}`);
+      }
     }
   } catch (error) {
-    console.warn('  ⚠ Login handling:', error.message);
+    console.warn('  ! Login error:', error.message);
   }
 
-  // Wait for app to load
-  await page.waitForTimeout(2000);
+  // Wait for app to fully load
+  await delay(2000);
 }
 
 /**
  * Navigate to a specific page within an app
  */
-async function navigateTo(page, path, waitForSelector = null) {
-  const url = path.startsWith('http') ? path : `${config.baseUrl}${path}`;
+async function navigateTo(page, urlPath, waitForSelector = null) {
+  const url = urlPath.startsWith('http') ? urlPath : `${config.baseUrl}${urlPath}`;
 
-  console.log(`  Navigating to: ${url}`);
+  debug(`Navigating to: ${url}`);
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
   if (waitForSelector) {
     try {
       await page.waitForSelector(waitForSelector, { timeout: 10000 });
     } catch {
-      console.warn(`  ⚠ Selector not found: ${waitForSelector}`);
+      debug(`Selector not found: ${waitForSelector}`);
     }
   }
 
   // Give page time to fully render
-  await page.waitForTimeout(1500);
+  await delay(1500);
 }
 
 /**
@@ -157,14 +215,14 @@ async function takeScreenshot(page, outputPath, options = {}) {
     if (element) {
       await element.screenshot({ path: fullPath });
     } else {
-      console.warn(`  ⚠ Element not found: ${options.selector}`);
+      debug(`Element not found: ${options.selector}`);
       await page.screenshot(screenshotOptions);
     }
   } else {
     await page.screenshot(screenshotOptions);
   }
 
-  console.log(`  ✓ Screenshot saved: ${outputPath}`);
+  console.log(`  + Saved: ${outputPath}`);
   return fullPath;
 }
 
@@ -175,12 +233,11 @@ async function executeActions(page, actions) {
   for (const action of actions) {
     switch (action) {
       case 'enableHeatmap':
-        // Click heatmap toggle if available
         try {
           await page.click('[cam-widget-search-pill-action="toggleHeatmap"]');
-          await page.waitForTimeout(1000);
+          await delay(1000);
         } catch {
-          console.warn('  ⚠ Heatmap toggle not found');
+          debug('Heatmap toggle not found');
         }
         break;
 
@@ -188,23 +245,23 @@ async function executeActions(page, actions) {
         try {
           await page.click('[ng-click="createFilter()"]');
           await page.waitForSelector('.modal-dialog', { timeout: 5000 });
-          await page.waitForTimeout(500);
+          await delay(500);
         } catch {
-          console.warn('  ⚠ Create filter dialog not found');
+          debug('Create filter dialog not found');
         }
         break;
 
       case 'openFilterDetail':
         try {
           await page.click('.filter-name');
-          await page.waitForTimeout(500);
+          await delay(500);
         } catch {
-          console.warn('  ⚠ Filter detail not found');
+          debug('Filter detail not found');
         }
         break;
 
       default:
-        console.warn(`  ⚠ Unknown action: ${action}`);
+        debug(`Unknown action: ${action}`);
     }
   }
 }
@@ -243,11 +300,11 @@ function resolvePath(pathTemplate, variables, dynamicData) {
  * Process a single screenshot definition
  */
 async function captureScreenshot(page, screenshot, configData, dynamicData) {
-  console.log(`\n📸 ${screenshot.id}: ${screenshot.description}`);
+  console.log(`\n[${screenshot.id}] ${screenshot.description}`);
 
   const category = configData.categories[screenshot.category];
   if (!category) {
-    console.error(`  ✗ Unknown category: ${screenshot.category}`);
+    console.error(`  ! Unknown category: ${screenshot.category}`);
     return false;
   }
 
@@ -256,7 +313,7 @@ async function captureScreenshot(page, screenshot, configData, dynamicData) {
 
   // Check if path has unresolved variables
   if (resolvedPath.includes('{')) {
-    console.warn(`  ⚠ Skipping - unresolved variables in path: ${resolvedPath}`);
+    console.warn(`  ! Skipping - unresolved variables in path: ${resolvedPath}`);
     return false;
   }
 
@@ -279,7 +336,7 @@ async function captureScreenshot(page, screenshot, configData, dynamicData) {
 
     return true;
   } catch (error) {
-    console.error(`  ✗ Failed: ${error.message}`);
+    console.error(`  ! Failed: ${error.message}`);
     return false;
   }
 }
@@ -288,25 +345,47 @@ async function captureScreenshot(page, screenshot, configData, dynamicData) {
  * Main capture workflow
  */
 async function main() {
-  console.log('═'.repeat(60));
+  console.log('='.repeat(60));
   console.log('  Operaton Screenshot Capture');
-  console.log('═'.repeat(60));
-  console.log(`\nTarget: ${config.baseUrl}`);
+  console.log('='.repeat(60));
+  console.log('');
+
+  if (config.debug) {
+    console.log('Configuration:');
+    console.log(`  Base URL: ${config.baseUrl}`);
+    console.log(`  REST URL: ${config.restUrl}`);
+    console.log(`  Username: ${config.username}`);
+    console.log(`  Password: ${'*'.repeat(config.password.length)}`);
+    console.log(`  Viewport: ${config.viewport.width}x${config.viewport.height}`);
+    console.log(`  Scale: ${config.deviceScaleFactor}x`);
+    console.log(`  Headless: ${config.headless}`);
+    console.log('');
+  }
+
+  console.log(`Target: ${config.baseUrl}`);
   console.log(`Output: ${OUTPUT_DIR}`);
-  console.log(`Headless: ${config.headless}\n`);
+  console.log(`Headless: ${config.headless}`);
+  console.log('');
 
   // Load configuration
-  const configData = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf8'));
+  let configData;
+  try {
+    configData = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf8'));
+  } catch (error) {
+    console.error(`! Failed to load config: ${error.message}`);
+    process.exit(1);
+  }
 
   // Get dynamic data
-  console.log('📊 Fetching dynamic data...');
+  console.log('Fetching dynamic data...');
   const dynamicData = await getDynamicData();
   console.log(`  Process instances: ${dynamicData.processInstances.length}`);
   console.log(`  Tasks: ${dynamicData.tasks.length}`);
   console.log(`  Decision instances: ${dynamicData.decisionInstances.length}`);
 
   // Launch browser
-  console.log('\n🌐 Launching browser...');
+  console.log('');
+  console.log('Launching browser...');
   const browser = await puppeteer.launch({
     headless: config.headless ? 'new' : false,
     args: [
@@ -333,23 +412,28 @@ async function main() {
     failed: [],
   };
 
-  try {
-    // Login to Cockpit first
-    console.log('\n🔐 Logging in to Cockpit...');
-    await login(page, 'cockpit');
+  let currentApp = null;
 
+  try {
     // Process each screenshot
     for (const screenshot of configData.screenshots) {
-      // Check if we need to switch apps
       const category = configData.categories[screenshot.category];
 
-      // Simple app switching - just navigate to the right app
+      // Determine which app this screenshot belongs to
+      let targetApp = 'cockpit';
       if (category.baseUrl.includes('/tasklist/')) {
-        await login(page, 'tasklist');
+        targetApp = 'tasklist';
       } else if (category.baseUrl.includes('/admin/')) {
-        await login(page, 'admin');
+        targetApp = 'admin';
       } else if (category.baseUrl.includes('/welcome/')) {
-        await login(page, 'welcome');
+        targetApp = 'welcome';
+      }
+
+      // Login to app if needed
+      if (currentApp !== targetApp) {
+        console.log(`\nSwitching to ${targetApp}...`);
+        await login(page, targetApp);
+        currentApp = targetApp;
       }
 
       const success = await captureScreenshot(page, screenshot, configData, dynamicData);
@@ -361,7 +445,7 @@ async function main() {
       }
     }
   } catch (error) {
-    console.error('\n✗ Fatal error:', error.message);
+    console.error('\n! Fatal error:', error.message);
     if (config.debug) {
       console.error(error.stack);
     }
@@ -370,24 +454,35 @@ async function main() {
   }
 
   // Print summary
-  console.log(`\n${'═'.repeat(60)}`);
+  console.log('');
+  console.log('='.repeat(60));
   console.log('  Capture Summary');
-  console.log('═'.repeat(60));
+  console.log('='.repeat(60));
   console.log(`  Captured: ${results.captured.length}`);
   console.log(`  Skipped:  ${results.skipped.length}`);
   console.log(`  Failed:   ${results.failed.length}`);
-  console.log(`${'═'.repeat(60)}\n`);
+  console.log('='.repeat(60));
 
   if (results.failed.length > 0) {
+    console.log('');
     console.log('Failed screenshots:');
     results.failed.forEach(id => console.log(`  - ${id}`));
   }
 
-  console.log('\nScreenshots saved to:', OUTPUT_DIR);
   console.log('');
+  console.log(`Screenshots saved to: ${OUTPUT_DIR}`);
+  console.log('');
+
+  // Exit with error if any failures
+  if (results.failed.length > 0) {
+    process.exit(1);
+  }
 }
 
 main().catch(err => {
-  console.error('Fatal error:', err);
+  console.error('Unexpected error:', err.message);
+  if (config.debug) {
+    console.error(err.stack);
+  }
   process.exit(1);
 });
