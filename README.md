@@ -21,13 +21,14 @@ documentation.
 
 ## Features
 
-- **Process Deployment**: Deploy BPMN/DMN processes to Operaton
-- **Data Generation**: Create users, groups, process instances, and tasks
-- **Scenario Simulation**: Create specific states (tokens, history, task states)
-- **Incident Creation**: Generate intentional failures for error screenshots
-- **Screenshot Capture**: Automated Puppeteer-based screen capture
-- **Environment Reset**: Clean wipe functionality for fresh starts
-- **Makefile Interface**: Convenient commands for all operations
+- **Documentation Scanning** : Scan docs for image references and generate capture configs
+- **Process Deployment** : Deploy BPMN/DMN processes to Operaton
+- **Data Generation** : Create users, groups, process instances, and tasks
+- **Scenario Simulation** : Create specific states (tokens, history, task states)
+- **Incident Creation** : Generate intentional failures for error screenshots
+- **Screenshot Capture** : Automated Puppeteer-based screen capture
+- **Screenshot Replacement** : Copy captured screenshots to documentation
+- **Environment Reset** : Clean wipe functionality for fresh starts
 
 ## Quick Start
 
@@ -42,88 +43,108 @@ cp .env.example .env
 # 3. Check connection
 make check
 
-# 4. Run quick workflow (deploy + data + capture)
-make quick
+# 4. Run the screenshot workflow
+make screenshots-workflow
+```
 
-# Or run full workflow (includes incidents)
-make full
+## Screenshot Workflow
+
+The complete workflow for updating documentation screenshots:
+
+```bash
+# 1. Scan documentation for image references
+make scan-docs
+
+# 2. Select a generated config (cockpit, tasklist, admin, or all)
+cp config/generated/screenshots-admin.json config/screenshots.json
+
+# 3. Set up the Operaton environment
+make  deploy # Deploy processes
+make data # Generate test data
+
+# 4. Capture screenshots
+mak capture
+
+# 5. Preview what will be replaced
+make  replace-screenshots
+
+# 6. Actually replace files in documentation
+make replace-screenshots-live
+
+# 7. Commit changes in documentation repo
+
+cd /path/to/documentation
+git add -A && git commit -m "Update webapp screenshots"
 ```
 
 ## Available Commands
 
 Run `make help` to see all available commands:
 
-### Setup & Installation
+### Setup & Conncetion
 
-| Command        | Description                       |
-| -------------- | --------------------------------- |
-| `make install` | Install npm dependencies          |
-| `make setup`   | Full setup: install + create .env |
-| `make check`   | Check connection to Operaton      |
+| Command        | Description                       | Docs                           |
+| -------------- | --------------------------------- | ------------------------------ |
+| `make install` | Install npm dependencies          |                                |
+| `make setup`   | Full setup: install + create .env |                                |
+| `make check`   | Check connection to Operaton      | [📖](docs/check-connection.md) |
+| `make status`  | Show environment status           | [📖](docs/show-status.md)      |
+
+### Documentation Scanning and Replacement
+
+| Command                         | Description                                      | Docs                                |
+| ------------------------------- | ------------------------------------------------ | ----------------------------------- |
+| `make analyze`                  | Analyze documentation for screenshots to replace | [📖](docs/analyze-documentation.md) |
+| `make scan-docs`                | Scan docs, generate configs                      | [📖](docs/scan-docs.md)             |
+| `make replace-screenshots`      | Preview replacements (dry run)                   | [📖](docs/replace-screenshots.md)   |
+| `make replace-screenshots-live` | Actually replace in docs                         | [📖](docs/replace-screenshots.md)   |
+| `make screenshots-workflow`     | Show full workflow instructions                  |                                     |
 
 ### Deployment & Data
 
-| Command           | Description                  |
-| ----------------- | ---------------------------- |
-| `make deploy`     | Deploy BPMN/DMN processes    |
-| `make users`      | Create users and groups only |
-| `make data`       | Generate full test data      |
-| `make data-light` | Generate minimal test data   |
+| Command       | Description                  | Docs                           |
+| ------------- | ---------------------------- | ------------------------------ |
+| `make deploy` | Deploy BPMN/DMN processes    | [📖](docs/deploy-processes.md) |
+| `make users`  | Create users and groups only | [📖](docs/generate-data.md)    |
+| `make data`   | Generate full test data      | [📖](docs/generate-data.md)    |
 
-### Simulation Scenarios
+### Simulation and Incidents
 
-| Command                 | Description                                    |
-| ----------------------- | ---------------------------------------------- |
-| `make simulate`         | Run all simulation scenarios                   |
-| `make simulate-tokens`  | Create instances with tokens at various stages |
-| `make simulate-history` | Generate completed instances for history views |
-
-### Incident Creation
-
-| Command                  | Description                   |
-| ------------------------ | ----------------------------- |
-| `make incidents`         | Create all types of incidents |
-| `make incidents-script`  | Script task failures only     |
-| `make incidents-service` | Service task failures only    |
+| Command                 | Description                                    | Docs                             |
+| ----------------------- | ---------------------------------------------- | -------------------------------- |
+| `make simulate`         | Run all simulation scenarios                   | [📖](docs/simulate-scenarios.md) |
+| `make simulate-tokens`  | Create instances with tokens at various stages | [📖](docs/simulate-scenarios.md) |
+| `make simulate-history` | Generate completed instances for history views | [📖](docs/simulate-scenarios.md) |
+| `make incidents`        | Create all types of incidents                  | [📖](docs/create-incidents.md)   |
 
 ### Screenshot Capture
 
-| Command                 | Description                        |
-| ----------------------- | ---------------------------------- |
-| `make capture`          | Capture all screenshots (headless) |
-| `make capture-debug`    | Capture with visible browser       |
-| `make capture-cockpit`  | Capture only Cockpit screenshots   |
-| `make capture-tasklist` | Capture only Tasklist screenshots  |
-| `make capture-admin`    | Capture only Admin screenshots     |
+| Command                | Description                        | Docs                              |
+| ---------------------- | ---------------------------------- | --------------------------------- |
+| `make capture`         | Capture all screenshots (headless) | [📖](docs/capture-screenshots.md) |
+| `make capture-debug`   | Capture with debug output          | [📖](docs/capture-screenshots.md) |
+| `make capture-visible` | Capture with visible browser       | [📖](docs/capture-screenshots.md) |
 
 ### Cleanup & Reset
 
-| Command                  | Description                        |
-| ------------------------ | ---------------------------------- |
-| `make reset`             | Reset Operaton (with confirmation) |
-| `make reset-force`       | Reset without confirmation         |
-| `make reset-instances`   | Delete process instances only      |
-| `make reset-deployments` | Delete deployments only            |
-| `make clean`             | Clean local output files           |
-| `make wipe`              | Full wipe: reset + clean           |
+| Command            | Description                        | Docs                            |
+| ------------------ | ---------------------------------- | ------------------------------- |
+| `make reset`       | Reset Operaton (with confirmation) | [📖](docs/reset-environment.md) |
+| `make reset-force` | Reset without confirmation         | [📖](docs/reset-environment.md) |
+| `make clean`       | Clean local output files           |                                 |
 
-### Workflows
+### Testing
 
-| Command      | Description                                    |
-| ------------ | ---------------------------------------------- |
-| `make quick` | Deploy → Data → Capture                        |
-| `make full`  | Deploy → Data → Simulate → Incidents → Capture |
-| `make fresh` | Reset → Full workflow                          |
-
-### Status & Debugging
-
-| Command                 | Description              |
-| ----------------------- | ------------------------ |
-| `make status`           | Show environment status  |
-| `make list-deployments` | List current deployments |
-| `make list-instances`   | List running instances   |
-| `make list-incidents`   | List current incidents   |
-| `make list-tasks`       | List current tasks       |
+```bash
+make test            # Run all chaos tests
+make chaos-check     # Test check-connection.js
+make chaos-status    # Test show-status.js
+make chaos-deploy    # Test deploy-processes.js
+make chaos-data      # Test generate-data.js
+make chaos-simulate  # Test simulate-scenarios.js
+make chaos-incidents # Test create-incidents.js
+make chaos-capture   # Test capture-screenshots.js
+```
 
 ## Configuration
 
@@ -136,131 +157,106 @@ OPERATON_REST_URL=https://operaton-doc.open-regels.nl/engine-rest
 OPERATON_USERNAME=demo
 OPERATON_PASSWORD=demo
 
-# Screenshot Settings
+# Screenshot Capture
 SCREENSHOT_WIDTH=1920
 SCREENSHOT_HEIGHT=1080
 SCREENSHOT_SCALE=2
-
-# Capture Settings
 HEADLESS=true
-DEBUG=false
 OUTPUT_DIR=./output/screenshots
+
+# Documentation Paths (required for scan/replace)
+DOCS_PATH=C:/Users/username/Development/documentation/docs
+STATIC_PATH=C:/Users/username/Development/documentation/static/img
+
+# Replacement Settings
+DRY_RUN=true
+VERBOSE=false
+
+# Debug
+DEBUG=false
 ```
 
-### Screenshot Definitions (config/screenshots.json)
+### Generated Reports
 
-The configuration file defines:
+```bash
+Command                   Report Location
+------------------------- ----------------------------------
+make scan-docs            config/generated/scan-report.md
+make replace-screenshots  output/replace-report.md
+```
 
-- Screenshot categories (cockpit, tasklist, admin, welcome)
-- Individual screenshot definitions with URLs and selectors
-- Required data prerequisites
-- Output file paths
+### Generated Configs
+
+After running `make scan-docs`:
+
+```bash
+config/generated/screenshots-cockpit.json   Cockpit webapp screenshots
+config/generated/screenshots-tasklist.json  Tasklist webapp screenshots
+config/generated/screenshots-admin.json     Admin webapp screenshots
+config/generated/screenshots-welcome.json   Welcome webapp screenshots
+config/generated/screenshots-all.json       All webapp screenshots
+config/generated/scan-report.md             Scan summary and statistics
+```
 
 ## Directory Structure
 
 ```
 operaton-screenshot-automation/
-├── Makefile                            # Command interface
-├── package.json                        # Node.js dependencies
-├── .env.example                        # Environment template
+├── Makefile                    # Command interface
+├── package.json                # Node.js dependencies
+├── .env.example                # Environment template
 ├── config/
-│   └── screenshots.json                # Screenshot definitions
+│   ├── screenshots.json        # Active screenshot config
+│   └── generated/              # Generated configs from scan
+├── docs/                       # Script documentation
 ├── processes/
-│   ├── bpmn/                           # BPMN process files
-│   │   └── invoice.bpmn                # Sample invoice process
-│   ├── dmn/                            # DMN decision files
-│   │   ├── invoice-assign-approver.dmn
-│   │   └── dish-decision.dmn
-│   └── cmmn/                           # CMMN case files
+│   ├── bpmn/                   # BPMN process files
+│   ├── dmn/                    # DMN decision files
+│   └── cmmn/                   # CMMN case files
 ├── scripts/
-│   ├── check-connection.js             # Connection checker
-│   ├── show-status.js                  # Status display
-│   ├── deploy-processes.js             # Process deployment
-│   ├── generate-data.js                # Data generation
-│   ├── simulate-scenarios.js           # Scenario simulation
-│   ├── create-incidents.js             # Incident creation
-│   ├── capture-screenshots.js          # Screenshot capture
-│   ├── analyze-documentation.js        # Doc analyzer
-│   └── reset-environment.js            # Environment reset
+│   ├── check-connection.js
+│   ├── show-status.js
+│   ├── deploy-processes.js
+│   ├── generate-data.js
+│   ├── simulate-scenarios.js
+│   ├── create-incidents.js
+│   ├── capture-screenshots.js
+│   ├── scan-docs.js
+│   ├── replace-screenshots.js
+│   └── reset-environment.js
+├── tests/                      # Chaos test suites
 └── output/
-    └── screenshots/                    # Captured screenshots
+    ├── screenshots/            # Captured screenshots
+    └── replace-report.md       # Replacement report
 ```
 
-## Simulation Scenarios
+## Typical Workflows
 
-### Token Positions
-
-Creates process instances with execution tokens at specific activities:
-
-- Token at "Approve Invoice" user task
-- Token at "Review Invoice" user task
-- Token at "Prepare Bank Transfer" user task
-
-### History Data
-
-Generates completed process instances with various outcomes:
-
-- Approved and paid invoices
-- Rejected invoices
-- Clarified and re-approved invoices
-
-### Task States
-
-Creates tasks in various states:
-
-- Unassigned tasks (candidate groups)
-- Assigned tasks
-- Overdue tasks
-- Tasks with follow-up dates
-
-## Incident Types
-
-### Script Task Failures
-
-Deploys processes with JavaScript that throws errors.
-
-### Service Task Failures
-
-Deploys processes with non-existent delegate expressions.
-
-### Expression Evaluation Errors
-
-Deploys processes with gateway conditions referencing undefined variables.
-
-### Async Job Failures
-
-Deploys async processes that fail during job execution.
-
-### External Task Failures
-
-Creates external tasks and explicitly fails them with error details.
-
-## Typical Workflow
+### Update All Admin Screenshots
 
 ```bash
-# 1. Start fresh
 make reset-force
-
-# 2. Deploy processes
-make deploy
-
-# 3. Generate base data
-make data
-
-# 4. Create specific scenarios
-make simulate
-
-# 5. Add incidents for error screenshots
-make incidents
-
-# 6. Check what we have
-make status
-
-# 7. Capture all screenshots
+make deploy && make data
+cp config/generated/screenshots-admin.json config/screenshots.json
 make capture
+make replace-screenshots
+make replace-screenshots-live
+```
 
-# 8. Review output
-ls -la output/screenshots/
+### Update All Webapp Screenshots
+
+```bash
+make reset-force
+make deploy && make data && make simulate
+cp config/generated/screenshots-all.json config/screenshots.json
+make capture
+make replace-screenshots-live
+```
+
+### Fresh Full Workflow with Incidents
+
+```bash
+make fresh    # Reset + Deploy + Data + Simulate + Incidents + Capture
 ```
 
 ## Troubleshooting
@@ -269,12 +265,14 @@ ls -la output/screenshots/
 
 ```bash
 make check  # Diagnose connection problems
+DEBUG=true make check
 ```
 
 ### Screenshots Not Capturing
 
 ```bash
-make capture-debug  # Run with visible browser
+make capture-visible  # Run with visible browser
+DEBUG=true make capture
 ```
 
 ### Processes Not Deploying
@@ -288,6 +286,18 @@ make capture-debug  # Run with visible browser
 - Ensure processes are deployed first
 - Check job executor is running
 - Wait for async jobs: incidents may take a few seconds
+
+### Scan Not Finding Images
+
+- Verify DOCS_PATH points to the docs folder
+- Check documentation has webapps/ folder structure
+- Images must be in webapps/cockpit/, webapps/admin/, etc.
+
+### Replacement Not Working
+
+- Set DRY_RUN=false or use make replace-screenshots-live
+- Verify DOCS_PATH and STATIC_PATH are correct
+- Check output/replace-report.md for details
 
 ## Adding Custom Processes
 
