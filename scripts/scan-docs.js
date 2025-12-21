@@ -6,11 +6,9 @@
  *
  * Scan Documentation for Screenshots
  *
- * Unified script that:
- * 1. Scans documentation for all image references
- * 2. Identifies webapp screenshots (cockpit, tasklist, admin, welcome)
- * 3. Detects Camunda-branded images that need replacement
- * 4. Generates capture configurations and reports
+ * Scans documentation for all image references:
+ * 1. Identifies webapp screenshots (cockpit, tasklist, admin, welcome)
+ * 2. Generates capture configurations and reports
  *
  * All output goes to output/scan/ (untracked)
  */
@@ -25,8 +23,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Configuration
 const config = {
   docsPath: process.env.DOCS_PATH || path.join(__dirname, '..', '..', 'documentation', 'docs'),
-  staticPath:
-    process.env.STATIC_PATH || path.join(__dirname, '..', '..', 'documentation', 'static', 'img'),
+  assetsPath:
+    process.env.ASSETS_PATH || path.join(__dirname, '..', '..', 'documentation', 'docs', 'assets'),
+  // Legacy static path (optional)
+  staticPath: process.env.STATIC_PATH || null,
   outputDir: process.env.SCAN_OUTPUT_DIR || path.join(__dirname, '..', 'output', 'scan'),
   debug: process.env.DEBUG === 'true',
   imageExtensions: ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'],
@@ -289,6 +289,28 @@ function generateScreenshotId(category, imagePath) {
 }
 
 /**
+ * Normalize output path to remove relative components
+ * Converts paths like "../../../assets/documentation/webapps/welcome/img.png"
+ * to "assets/documentation/webapps/welcome/img.png"
+ */
+function normalizeOutputPath(imagePath) {
+  // Remove leading relative path components (../, ./)
+  let normalized = imagePath
+    .replace(/^(\.\.\/)+/g, '') // Remove leading ../
+    .replace(/^(\.\/)+/g, ''); // Remove leading ./
+
+  // Remove leading slash
+  if (normalized.startsWith('/')) {
+    normalized = normalized.substring(1);
+  }
+
+  // Normalize path separators
+  normalized = normalized.replace(/\\/g, '/');
+
+  return normalized;
+}
+
+/**
  * Scan all markdown files
  */
 async function scanDocumentation() {
@@ -369,10 +391,7 @@ function generateCategoryConfig(category, images) {
   const seenOutputFiles = new Set();
 
   for (const image of images) {
-    let outputFile = image.path;
-    if (outputFile.startsWith('/')) {
-      outputFile = outputFile.substring(1);
-    }
+    const outputFile = normalizeOutputPath(image.path);
 
     if (seenOutputFiles.has(outputFile)) {
       continue;
@@ -434,10 +453,7 @@ function generateCombinedConfig() {
     };
 
     for (const image of images) {
-      let outputFile = image.path;
-      if (outputFile.startsWith('/')) {
-        outputFile = outputFile.substring(1);
-      }
+      const outputFile = normalizeOutputPath(image.path);
 
       if (seenOutputFiles.has(outputFile)) {
         continue;
