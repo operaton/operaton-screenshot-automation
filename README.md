@@ -56,7 +56,7 @@ The complete workflow for updating documentation screenshots:
 make scan-docs
 
 # 2. Select a generated config (cockpit, tasklist, admin, or all)
-cp config/generated/screenshots-admin.json config/screenshots.json
+cp cp output/scan/screenshots-admin.json config/screenshots.json
 
 # 3. Set up the Operaton environment
 make  deploy # Deploy processes
